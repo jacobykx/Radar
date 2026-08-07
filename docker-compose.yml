@@ -1,0 +1,88 @@
+# Local development stack: Postgres, the API and the frontend.
+#
+#   docker compose up --build
+#   docker compose run --rm seed      # load the 20 synthetic reviews
+#
+# This mirrors a deployed environment closely enough to catch Postgres-only problems
+# (JSONB, server defaults, transactional DDL) that the SQLite fallback hides. It is a
+# development convenience, not a production deployment descriptor -- FRAME builds and
+# runs the images itself.
+
+name: iap-planning
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: iap
+      POSTGRES_PASSWORD: iap_local_dev
+      POSTGRES_DB: iap
+    ports:
+      # Exposed so the native (non-Docker) path can use the same database.
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iap -d iap"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Runs `alembic upgrade head` once, then exits. The API waits for it to complete, so
+  # the service never starts against a schema older than its code.
+  migrate:
+    build:
+      context: ./backend
+    environment:
+      IAP_DATABASE_URL: postgresql+psycopg://iap:iap_local_dev@db:5432/iap
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      IAP_DATABASE_URL: postgresql+psycopg://iap:iap_local_dev@db:5432/iap
+      # LOCAL ONLY. In a deployed environment FRAME terminates auth and this stays false.
+      IAP_AUTH_DEV_MODE: "true"
+      IAP_CORS_ORIGINS: http://localhost:3010,http://127.0.0.1:3010
+      IAP_PLAN_YEAR: "2027"
+    ports:
+      - "8010:8010"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Inlined into the client bundle at build time, so it must be the URL the
+        # browser uses -- not the compose-internal hostname.
+        NEXT_PUBLIC_API_BASE: http://127.0.0.1:8010
+    ports:
+      - "3010:3010"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Development fixtures. Not part of `up` -- run it deliberately:
+  #   docker compose run --rm seed
+  seed:
+    build:
+      context: ./backend
+    environment:
+      IAP_DATABASE_URL: postgresql+psycopg://iap:iap_local_dev@db:5432/iap
+    command: ["python", "-m", "scripts.bootstrap", "--reset"]
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  db_data:

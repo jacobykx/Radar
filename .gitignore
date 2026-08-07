@@ -18,14 +18,22 @@ out/
 *.tsbuildinfo
 npm-debug.log*
 
+# CI test and coverage reports
+junit.xml
+reports/
+coverage/
+coverage.xml
+
 # The generated API client IS committed, deliberately: it keeps the repo type-checkable
 # and buildable without a running backend. Regenerate it with `npm run generate:api`
 # whenever the API contract changes — never edit it by hand.
 
-# Environment — never commit connection strings or secrets
+# Environment — never commit connection strings or secrets.
+# The *.example templates carry placeholders only and are meant to be read.
 .env
 .env.*
 !.env.example
+!.env.deployed.example
 
 # OS / editor
 .DS_Store

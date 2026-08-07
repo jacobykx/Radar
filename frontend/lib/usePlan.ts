@@ -39,9 +39,15 @@ export function usePlan() {
   }, []);
 
   useEffect(() => {
-    api.GET("/permission", {}).then((r) => {
-      if (r.data) setIdentity(r.data as unknown as Identity);
-    });
+    api
+      .GET("/permission", {})
+      .then((r) => {
+        if (r.data) setIdentity(r.data as unknown as Identity);
+      })
+      // An unreachable backend must not raise an unhandled rejection. The refresh below
+      // owns the user-facing message; identity simply stays null and the UI hides the
+      // role-gated controls.
+      .catch(() => setIdentity(null));
     refresh().catch(() => {
       setError("Cannot reach the backend. Is it running on " + process.env.NEXT_PUBLIC_API_BASE + "?");
       setLoading(false);

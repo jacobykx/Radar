@@ -12,7 +12,8 @@ from datetime import date
 
 import pytest
 
-from app.domain import approval, capacity as cap, helios, scheduling, scoring, staging
+from app.domain import approval, helios, scheduling, scoring, staging
+from app.domain import capacity as cap
 from app.domain.constants import (
     SIZE_DAYS,
     SIZE_FTE,
@@ -141,7 +142,10 @@ def test_descoping_without_a_rationale_is_refused():
         staging.validate_descope(None)
     with pytest.raises(RationaleRequired):
         staging.validate_descope("  ")
-    assert staging.validate_descope("  covered by the 2026 thematic  ") == "covered by the 2026 thematic"
+    assert (
+        staging.validate_descope("  covered by the 2026 thematic  ")
+        == "covered by the 2026 thematic"
+    )
 
 
 def test_a_descoped_review_leaves_every_downstream_stage(weights):
@@ -234,7 +238,9 @@ def test_waterfall_fills_the_earliest_quarter_with_room(weights, capacity):
     reviews = [make_review(f"1.{i}", size=EffortSize.M) for i in range(1, 5)]  # 3 FTE each, cap 10
     result = scheduling.waterfall(reviews, [capacity], weights)
 
-    assert result.quarters == {"1.1": Quarter.Q1, "1.2": Quarter.Q1, "1.3": Quarter.Q1, "1.4": Quarter.Q2}
+    assert result.quarters == {
+        "1.1": Quarter.Q1, "1.2": Quarter.Q1, "1.3": Quarter.Q1, "1.4": Quarter.Q2,
+    }
     assert not result.unplaced
 
 
@@ -336,7 +342,9 @@ def test_returning_a_review_requires_a_comment():
     """Rule 10. An approval needs no words; a rejection does."""
     with pytest.raises(CommentRequired):
         approval.validate_decision(ApprovalStatus.RETURNED, "")
-    assert approval.validate_decision(ApprovalStatus.RETURNED, "scope too broad") == "scope too broad"
+    assert (
+        approval.validate_decision(ApprovalStatus.RETURNED, "scope too broad") == "scope too broad"
+    )
     assert approval.validate_decision(ApprovalStatus.APPROVED, None) == ""
 
 

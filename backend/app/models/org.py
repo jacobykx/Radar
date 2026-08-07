@@ -23,7 +23,7 @@ class AssuranceFunction(Base, TimestampMixin):
     #: Replaces the prototype's roster-derived "staffed teams" (decision D2).
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    sub_teams: Mapped[list["SubTeam"]] = relationship(
+    sub_teams: Mapped[list[SubTeam]] = relationship(
         back_populates="assurance_function", cascade="all, delete-orphan"
     )
 

@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+  POETRY_VERSION: "2.3.3"
+
+jobs:
+  backend:
+    name: Backend (lint, tests, migrations on Postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: iap
+          POSTGRES_PASSWORD: iap_ci
+          POSTGRES_DB: iap
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iap -d iap"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # Postgres, not the SQLite fallback: CI must exercise the dialect that is deployed.
+      IAP_DATABASE_URL: postgresql+psycopg://iap:iap_ci@127.0.0.1:5432/iap
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        run: pipx install "poetry==${{ env.POETRY_VERSION }}"
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/poetry.lock') }}
+
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true --local
+          poetry install --no-interaction
+
+      - name: Lint
+        run: poetry run ruff check .
+
+      - name: Tests
+        run: poetry run pytest
+
+      - name: Migrations apply, reverse and re-apply
+        run: |
+          poetry run alembic upgrade head
+          poetry run alembic downgrade base
+          poetry run alembic upgrade head
+
+      - name: Migrations match the models
+        # Fails if someone changed a model without generating a revision.
+        run: poetry run alembic check
+
+      - name: Seed loads
+        run: poetry run python -m scripts.bootstrap --reset
+
+      - name: API answers on Postgres
+        run: |
+          poetry run python -m uvicorn app.main:app --port 8010 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8010/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8010/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8010/reviews)" = 200
+
+  frontend:
+    name: Frontend (typecheck, tests, build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  api-contract:
+    name: Generated client matches the API
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Poetry
+        run: pipx install "poetry==${{ env.POETRY_VERSION }}"
+
+      - name: Install both halves
+        run: |
+          cd backend && poetry config virtualenvs.in-project true --local && poetry install --no-interaction
+          cd ../frontend && npm ci
+
+      - name: Regenerate the client and diff it
+        # frontend/lib/api/generated/schema.d.ts is committed so the repo builds without a
+        # running backend. That only holds while it matches the API -- this proves it does.
+        run: |
+          cd backend
+          IAP_DATABASE_URL=sqlite+pysqlite:///./ci.db poetry run python -m uvicorn app.main:app --port 8010 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8010/health && break
+            sleep 1
+          done
+          cd ../frontend && npm run generate:api
+          git diff --exit-code -- lib/api/generated/schema.d.ts \
+            || (echo "::error::The committed API client is stale. Run 'npm run generate:api' and commit the result." && exit 1)

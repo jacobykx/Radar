@@ -30,7 +30,7 @@ class Plan(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="Draft")
 
-    reviews: Mapped[list["Review"]] = relationship(back_populates="plan")
+    reviews: Mapped[list[Review]] = relationship(back_populates="plan")
 
 
 class Review(Base, TimestampMixin):
@@ -74,26 +74,26 @@ class Review(Base, TimestampMixin):
     plan: Mapped[Plan] = relationship(back_populates="reviews")
     assurance_function: Mapped[AssuranceFunction] = relationship(lazy="selectin")
     sub_team: Mapped[SubTeam | None] = relationship(lazy="selectin")
-    locations: Mapped[list["ReviewLocation"]] = relationship(
+    locations: Mapped[list[ReviewLocation]] = relationship(
         back_populates="review", cascade="all, delete-orphan", lazy="selectin"
     )
-    scores: Mapped[list["ReviewScore"]] = relationship(
+    scores: Mapped[list[ReviewScore]] = relationship(
         back_populates="review", cascade="all, delete-orphan", lazy="selectin",
         order_by="ReviewScore.as_at.desc()",
     )
-    item: Mapped["PlanItem"] = relationship(
+    item: Mapped[PlanItem] = relationship(
         back_populates="review", cascade="all, delete-orphan", uselist=False, lazy="selectin"
     )
-    prestaging: Mapped["HeliosPrestaging"] = relationship(
+    prestaging: Mapped[HeliosPrestaging] = relationship(
         back_populates="review", cascade="all, delete-orphan", uselist=False, lazy="selectin"
     )
-    approvals: Mapped[list["Approval"]] = relationship(
+    approvals: Mapped[list[Approval]] = relationship(
         back_populates="review", cascade="all, delete-orphan", lazy="selectin"
     )
-    steward: Mapped["StewardConsultation"] = relationship(
+    steward: Mapped[StewardConsultation] = relationship(
         back_populates="review", cascade="all, delete-orphan", uselist=False, lazy="selectin"
     )
-    notes: Mapped[list["ReviewNote"]] = relationship(
+    notes: Mapped[list[ReviewNote]] = relationship(
         back_populates="review", cascade="all, delete-orphan", lazy="selectin",
         order_by="ReviewNote.created_at.desc()",
     )
