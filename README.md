@@ -16,7 +16,7 @@ See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 
 ## Running it locally
 
-You need **Python 3.11** and **Node 22**. That is the whole list — the database is a
+You need **Python 3.12** and **Node 22**. That is the whole list — the database is a
 SQLite file and authentication is stubbed, so there is nothing else to install, stand up
 or connect to.
 

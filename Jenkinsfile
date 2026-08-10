@@ -18,7 +18,7 @@ pipeline {
     }
 
     environment {
-        PYTHON_VERSION = '3.11'
+        PYTHON_VERSION = '3.12'
         NODE_VERSION   = '22'
         POETRY_VERSION = '2.3.3'
         // Ephemeral database for the build only. No deployed credential is ever read here.
