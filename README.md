@@ -46,6 +46,37 @@ FRAME uses Poetry, so `poetry install && poetry run ...` is the canonical path, 
 cd backend && poetry config virtualenvs.in-project true --local && poetry install
 ```
 
+<details>
+<summary><strong>"The currently activated Python version … is not supported by the project"</strong></summary>
+
+Poetry found an interpreter older than 3.12, which is what `pyproject.toml` requires.
+Install 3.12 and point Poetry at it rather than relaxing the constraint: the code uses
+`datetime.UTC` and PEP 604 `X | None` annotations that Pydantic and SQLAlchemy evaluate
+at runtime, so an older interpreter fails at import rather than degrading gracefully —
+you would trade a clear error now for an obscure one at startup.
+
+On Windows — `winget install Python.Python.3.12` if you do not have it, then ask the
+launcher where it went and hand Poetry that path:
+
+```powershell
+py -3.12 -c "import sys; print(sys.executable)"
+poetry env use C:\path\printed\above\python.exe
+poetry install
+```
+
+On macOS or Linux, `python3.12` is usually already resolvable:
+
+```bash
+poetry env use python3.12
+poetry install
+```
+
+`poetry env info --path` confirms which environment is now active. If it still complains,
+delete `backend/.venv` and re-run — one may already exist built against the wrong
+interpreter.
+
+</details>
+
 Create the local configuration. `auth_dev_mode` defaults to **false** so a deployment
 that forgets to configure it fails closed with a 401 rather than accepting anonymous
 callers as administrators — local development opts in through this file, which is
