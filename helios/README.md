@@ -4,8 +4,8 @@ A lite app whose only job is to produce a **valid Helios bulk upload CSV**. It i
 narrowed rebuild of the pre-staging tab from the MVP prototype
 (`2027_IAP_Planning_Module.html`), with the planning workflow around it left out.
 
-Standard library only — no pip install, no Poetry, no Node, no database. **Python 3.9 or
-newer**, unlike `backend/`, which needs 3.12.
+Standard library only — no pip install, no Poetry, no Node, no database. **Python 3.12**,
+the same interpreter `backend/` requires, so one machine setup runs the whole repository.
 
 ```bash
 python3 -m helios                          # http://127.0.0.1:8000
@@ -24,9 +24,9 @@ py -m helios reviews.csv -o out.csv
 py -m unittest discover -s helios\tests -t .
 ```
 
-CI runs the full suite on `windows-latest` as well as Linux, and on 3.9 as well as 3.12,
-so "works on Windows" is a test result rather than an intention. See
-[Windows specifics](#windows-specifics) for what that covers.
+CI runs the full suite on `windows-latest` as well as Linux, so "works on Windows" is a
+test result rather than an intention. See [Windows specifics](#windows-specifics) for what
+that covers.
 
 ## What it does
 

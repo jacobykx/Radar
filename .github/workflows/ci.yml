@@ -95,21 +95,17 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8010/reviews)" = 200
 
   helios:
-    name: Helios CSV export (${{ matrix.os }}, py${{ matrix.python }})
+    name: Helios CSV export (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Windows is a first-class target here, not an afterthought: the CSV goes to a
-          # bank's upload form from whatever laptop the planner has, and the encoding and
-          # line-ending bugs this catches only ever appear there.
-          - { os: windows-latest, python: "3.12" }
-          - { os: ubuntu-latest, python: "3.12" }
-          # The oldest interpreter the app claims to support. The backend needs 3.12; this
-          # app deliberately does not, so that a planner can run it on stock Python.
-          - { os: ubuntu-latest, python: "3.9" }
+        # Windows is a first-class target, not an afterthought: the CSV goes to a bank's
+        # upload form from whatever laptop the planner has, and the encoding and
+        # line-ending bugs this catches only ever appear there. Python is 3.12 on both —
+        # the same version backend/ requires, so one machine setup runs the whole repo.
+        os: [windows-latest, ubuntu-latest]
 
     defaults:
       run:
@@ -120,7 +116,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       # No install step, deliberately: the app is standard library only, and this job
       # failing on a missing dependency is how we find out that stopped being true.
