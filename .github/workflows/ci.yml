@@ -94,6 +94,55 @@ jobs:
           curl -sf http://127.0.0.1:8010/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8010/reviews)" = 200
 
+  helios:
+    name: Helios CSV export (tests, CLI, server)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # No install step, deliberately: the app is standard library only, and this job
+      # failing on a missing dependency is how we find out that stopped being true.
+      - name: Tests
+        run: python3 -m unittest discover -s helios/tests -t .
+
+      - name: CLI refuses an incomplete plan
+        run: |
+          printf 'ref,title\n3.1,A review with nothing else filled in\n' > /tmp/thin.csv
+          if python3 -m helios /tmp/thin.csv > /tmp/out.csv 2> /tmp/err.txt; then
+            echo "::error::A row missing every required field was exported anyway." && exit 1
+          fi
+          grep -q "Review Lead (Staff ID) is required." /tmp/err.txt
+          test ! -s /tmp/out.csv
+
+      - name: CLI produces a valid file from a complete plan
+        run: |
+          cat > /tmp/plan.csv <<'CSV'
+          ref,title,team,sub-team,category,lead,go-live,mandated,rationale
+          4.1,Incident reporting regime,Regulatory Reporting Assurance,UK (RC),Global,45012345,18 Mar 2027,yes,First live submissions.
+          CSV
+          python3 -m helios /tmp/plan.csv -o /tmp/helios.csv
+          python3 - <<'PY'
+          import csv
+          from helios import spec
+          rows = list(csv.reader(open("/tmp/helios.csv", newline="")))
+          assert rows[0] == spec.HEADER, "header drifted from the spec"
+          assert len(rows) == 2 and len(rows[1]) == len(spec.FIELDS)
+          assert dict(zip(rows[0], rows[1]))["Plan Quarter"] == "Q1"
+          PY
+
+      - name: Server serves the app and enforces the same rules
+        run: |
+          python3 -m helios --port 8020 &
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:8020/ > /dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8020/api/spec > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8020/api/export \
+            -H 'Content-Type: application/json' -d '{"rows":[{"title":"incomplete"}]}')" = 422
+
   frontend:
     name: Frontend (typecheck, tests, build)
     runs-on: ubuntu-latest

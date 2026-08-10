@@ -12,6 +12,11 @@ is not in front of the API.
 
 See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 
+> **Just need the Helios CSV?** [`helios/`](helios/README.md) is a lite app that does only
+> that — map approved reviews onto the Helios columns, normalise, validate, export. Standard
+> library only, so `python3 -m helios` is the whole install story. It shares no code with the
+> stack below and needs none of it running.
+
 ---
 
 ## Running it locally
