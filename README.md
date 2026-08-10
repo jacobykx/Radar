@@ -142,14 +142,47 @@ cd ..\frontend
 npm install
 ```
 
-Then two terminals:
+Then two terminals. Run the `cd` as its own line — do not chain it with `;`, which in
+PowerShell runs the next statement whether or not the `cd` succeeded, and **the backend
+must be started from `backend`** for the reason below:
 
 ```powershell
-cd backend  ; poetry run python -m uvicorn app.main:app --port 8010 --reload
-cd frontend ; npm run dev
+# Terminal 1 — from the repository root
+cd backend
+poetry run python -m uvicorn app.main:app --port 8010 --reload
 ```
 
-In `cmd.exe` the only changes are `copy .env.example .env` and `&&` in place of `;`.
+```powershell
+# Terminal 2 — from the repository root
+cd frontend
+npm run dev
+```
+
+In `cmd.exe` the only other change is `copy .env.example .env` for the setup step.
+
+> `&&` chains only in PowerShell 7+. Windows PowerShell 5.1 — still the default on many
+> machines — rejects it as a syntax error, and `;` is not a substitute because it ignores
+> failure. Separate lines work in both.
+
+<details>
+<summary><strong>Started, but every request 401s or 500s</strong></summary>
+
+Almost always the working directory. `poetry install` puts the project on the path, so
+`app.main:app` imports from anywhere and **uvicorn starts happily** — `/health` even
+returns 200. But two settings are resolved relative to the current directory, and neither
+failure is loud:
+
+- `.env` is read from the working directory, so outside `backend` it is not found,
+  `IAP_AUTH_DEV_MODE` falls back to its secure default of false, and every request
+  returns **401**.
+- `IAP_DATABASE_URL` defaults to `sqlite+pysqlite:///./iap_local.db` — also relative — so
+  a second, empty database file is created wherever you started from, and requests fail
+  with **500** and `no such table: plan`.
+
+`Get-Location` shows where you are; it must be the `backend` directory. A stray
+zero-byte `iap_local.db` outside `backend` is the tell-tale sign, and is safe to delete.
+
+</details>
 
 **One PowerShell gotcha.** `curl` is an alias for `Invoke-WebRequest`, which does not take
 `-H`. The RBAC example further down needs `curl.exe` explicitly:
