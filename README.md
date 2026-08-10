@@ -34,7 +34,8 @@ make dev-frontend   # http://127.0.0.1:3010
 ```
 
 `make help` lists every target. The rest of this section is what those targets do, for
-anyone who would rather run the steps by hand.
+anyone who would rather run the steps by hand — **including on Windows, where `make` is
+not present by default. See [On Windows](#on-windows).**
 
 ### Backend — http://127.0.0.1:8010
 
@@ -45,6 +46,37 @@ FRAME uses Poetry, so `poetry install && poetry run ...` is the canonical path, 
 cd backend && poetry config virtualenvs.in-project true --local && poetry install
 ```
 
+<details>
+<summary><strong>"The currently activated Python version … is not supported by the project"</strong></summary>
+
+Poetry found an interpreter older than 3.12, which is what `pyproject.toml` requires.
+Install 3.12 and point Poetry at it rather than relaxing the constraint: the code uses
+`datetime.UTC` and PEP 604 `X | None` annotations that Pydantic and SQLAlchemy evaluate
+at runtime, so an older interpreter fails at import rather than degrading gracefully —
+you would trade a clear error now for an obscure one at startup.
+
+On Windows — `winget install Python.Python.3.12` if you do not have it, then ask the
+launcher where it went and hand Poetry that path:
+
+```powershell
+py -3.12 -c "import sys; print(sys.executable)"
+poetry env use C:\path\printed\above\python.exe
+poetry install
+```
+
+On macOS or Linux, `python3.12` is usually already resolvable:
+
+```bash
+poetry env use python3.12
+poetry install
+```
+
+`poetry env info --path` confirms which environment is now active. If it still complains,
+delete `backend/.venv` and re-run — one may already exist built against the wrong
+interpreter.
+
+</details>
+
 Create the local configuration. `auth_dev_mode` defaults to **false** so a deployment
 that forgets to configure it fails closed with a 401 rather than accepting anonymous
 callers as administrators — local development opts in through this file, which is
@@ -54,19 +86,22 @@ git-ignored:
 cd backend && cp .env.example .env
 ```
 
+<!-- Commands below use `poetry run`, which resolves the virtualenv the same way on every
+platform. `.venv/bin/...` would be `.venv\Scripts\...` on Windows. -->
+
 Create the schema and load the synthetic fixtures — 20 reviews ported from the
 prototype. The schema comes from Alembic, the same migrations a deployed environment
 runs, so a local database cannot drift from what SIT, UAT and PROD get. `--reset`
 downgrades to base first, so re-run it any time to get back to a clean plan:
 
 ```bash
-cd backend && .venv/bin/python -m scripts.bootstrap --reset
+cd backend && poetry run python -m scripts.bootstrap --reset
 ```
 
 Start it:
 
 ```bash
-cd backend && .venv/bin/python -m uvicorn app.main:app --port 8010 --reload
+cd backend && poetry run python -m uvicorn app.main:app --port 8010 --reload
 ```
 
 ### Frontend — http://127.0.0.1:3010
@@ -76,6 +111,88 @@ cd frontend && npm install && npm run dev
 ```
 
 Open **http://127.0.0.1:3010**.
+
+### On Windows
+
+Everything runs natively — Python, Node, Poetry and npm all work, and the SQLite fallback
+needs no extra services. Two things differ.
+
+**`make` is not installed by default.** The `make` targets above are a convenience, not a
+dependency; every one of them is a short command you can run directly. Either install it
+(`winget install GnuWin32.Make`, or `scoop install make`) or use the commands below. Note
+that even with `make` installed, `make clean` still won't work — it shells out to `find`
+and `rm`. Under WSL or Git Bash the whole Makefile works unchanged.
+
+**Virtualenv scripts live in `.venv\Scripts\`, not `.venv/bin/`.** Prefer `poetry run`,
+which resolves this for you and is identical on every platform. The commands in this
+README use it for that reason.
+
+The full setup in PowerShell, from the repository root:
+
+```powershell
+# Backend
+cd backend
+poetry config virtualenvs.in-project true --local
+poetry install
+Copy-Item .env.example .env
+poetry run python -m scripts.bootstrap --reset
+
+# Frontend, in the same shell
+cd ..\frontend
+npm install
+```
+
+Then two terminals. Run the `cd` as its own line — do not chain it with `;`, which in
+PowerShell runs the next statement whether or not the `cd` succeeded, and **the backend
+must be started from `backend`** for the reason below:
+
+```powershell
+# Terminal 1 — from the repository root
+cd backend
+poetry run python -m uvicorn app.main:app --port 8010 --reload
+```
+
+```powershell
+# Terminal 2 — from the repository root
+cd frontend
+npm run dev
+```
+
+In `cmd.exe` the only other change is `copy .env.example .env` for the setup step.
+
+> `&&` chains only in PowerShell 7+. Windows PowerShell 5.1 — still the default on many
+> machines — rejects it as a syntax error, and `;` is not a substitute because it ignores
+> failure. Separate lines work in both.
+
+<details>
+<summary><strong>Started, but every request 401s or 500s</strong></summary>
+
+Almost always the working directory. `poetry install` puts the project on the path, so
+`app.main:app` imports from anywhere and **uvicorn starts happily** — `/health` even
+returns 200. But two settings are resolved relative to the current directory, and neither
+failure is loud:
+
+- `.env` is read from the working directory, so outside `backend` it is not found,
+  `IAP_AUTH_DEV_MODE` falls back to its secure default of false, and every request
+  returns **401**.
+- `IAP_DATABASE_URL` defaults to `sqlite+pysqlite:///./iap_local.db` — also relative — so
+  a second, empty database file is created wherever you started from, and requests fail
+  with **500** and `no such table: plan`.
+
+`Get-Location` shows where you are; it must be the `backend` directory. A stray
+zero-byte `iap_local.db` outside `backend` is the tell-tale sign, and is safe to delete.
+
+</details>
+
+**One PowerShell gotcha.** `curl` is an alias for `Invoke-WebRequest`, which does not take
+`-H`. The RBAC example further down needs `curl.exe` explicitly:
+
+```powershell
+curl.exe -H "x-frame-user: someone" -H "x-frame-ad-groups: IAP_READER" http://127.0.0.1:8010/permission
+```
+
+Docker Desktop runs the containerised stack unchanged — `docker compose up --build`,
+`docker compose run --rm seed`, `docker compose down -v`.
 
 ### Postgres, in containers
 
@@ -125,6 +242,12 @@ cd frontend && npm run generate:api
 It reads `NEXT_PUBLIC_API_BASE` and falls back to `http://127.0.0.1:8010`. Regenerating
 is what turns a backend contract change into a compile error rather than a runtime one,
 so run it before assuming a frontend break is a frontend bug.
+
+The script behind it is `frontend/scripts/generate-api.mjs`, which calls
+openapi-typescript's API directly rather than shelling out. That is deliberate: the
+previous one-line npm script defaulted the URL with `${NEXT_PUBLIC_API_BASE:-...}`, which
+is POSIX shell syntax that `cmd.exe` passes through verbatim, so it fetched a literal
+`${...}` and failed on Windows.
 
 ---
 
@@ -220,7 +343,7 @@ and re-applies it on every build.
 |---|---|
 | Ports **8010** / **3010** | Local choices only — 8000 was already in use on the original development machine. FRAME serves both behind the platform |
 | `frontend/next.config.mjs` | `allowedDevOrigins` is a development-only workaround; `NEXT_PUBLIC_API_BASE` should come from environment configuration |
-| `frontend/package.json` | The `generate:api` URL points at localhost |
+| `frontend/scripts/generate-api.mjs` | The `generate:api` fallback URL points at localhost |
 | `Jenkinsfile` | The agent label and credential IDs are placeholders, confirmed during FRAME onboarding |
 | Branch names | FRAME's Jenkins triggers on `feature/all/<JIRA-TICKET>` |
 
@@ -259,6 +382,13 @@ make test-backend   # pytest — 35 cases
 make test-frontend  # jest — 13 cases
 ```
 
+Without `make` — on Windows, or anywhere else:
+
+```bash
+cd backend  && poetry run pytest      # 35 cases
+cd frontend && npm test               # 13 cases
+```
+
 The backend's 35 cases cover the methodology in `BUILD_INSTRUCTIONS.md` section 2. They
 are written against the services layer, before the UI, so a later refactor cannot quietly
 break the rules.
@@ -269,8 +399,8 @@ They stub `fetch` at setup module scope, because openapi-fetch captures `globalT
 when the client is constructed: a stub installed any later would leave the specs quietly
 talking to a real backend.
 
-If `make test-backend` reports `No module named pytest`, the dev dependencies were not
-installed — run `make setup-backend`.
+If either reports `No module named pytest`, the dev dependencies were not installed —
+run `poetry install` in `backend`.
 
 ---
 
