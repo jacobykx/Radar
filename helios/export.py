@@ -29,15 +29,23 @@ class Export:
         return not self.errors
 
 
-def write(rows: list[dict[str, str]]) -> str:
-    """Render prepared rows as CSV text. Assumes the rows have already been validated."""
+def table(header: list[str], rows: list[list[object]]) -> str:
+    """Render any table as CSV, on the terms every export here uses.
+
+    QUOTE_ALL and CRLF: Helios's loader is quote-tolerant but not delimiter-tolerant, and
+    the free-text columns routinely contain commas and newlines. The governance exports
+    use the same settings so every file the tool emits opens the same way.
+    """
     buffer = io.StringIO()
-    # QUOTE_ALL and CRLF: Helios's loader is quote-tolerant but not delimiter-tolerant, and
-    # the free-text columns routinely contain commas and newlines.
     writer = csv.writer(buffer, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
-    writer.writerow(spec.HEADER)
-    writer.writerows([row.get(f.key, "") for f in spec.FIELDS] for row in rows)
+    writer.writerow(header)
+    writer.writerows(["" if cell is None else cell for cell in row] for row in rows)
     return buffer.getvalue()
+
+
+def write(rows: list[dict[str, str]]) -> str:
+    """Render prepared Helios rows. Assumes the rows have already been validated."""
+    return table(spec.HEADER, [[row.get(f.key, "") for f in spec.FIELDS] for row in rows])
 
 
 def build(rows: list[dict[str, object]]) -> Export:

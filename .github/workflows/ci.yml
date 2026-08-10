@@ -175,11 +175,54 @@ jobs:
 
       - name: Server serves the app and enforces the same rules
         run: |
-          python -m helios --port 8020 &
+          python -m helios --port 8020 --data ci-plan.json &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:8020/ > /dev/null && break; sleep 2; done
           curl -sf http://127.0.0.1:8020/api/spec > /dev/null
+          curl -sf http://127.0.0.1:8020/api/plan > /dev/null
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8020/api/export \
             -H 'Content-Type: application/json' -d '{"rows":[{"title":"incomplete"}]}')" = 422
+
+      - name: The planning workflow runs, and the methodology refuses what it should
+        run: |
+          op() { curl -s -o /dev/null -w '%{http_code}' -X POST \
+            "http://127.0.0.1:8020/api/op/$1" -H 'Content-Type: application/json' -d "$2"; }
+          test "$(op stage.critical_and_high '{"user":"CI"}')" = 200
+          test "$(op quarters.waterfall '{"user":"CI"}')" = 200
+          # a priority override with no rationale, and descoping a mandated review, are refused
+          test "$(op priority '{"user":"CI","ref":"3.2","value":4.9}')" = 422
+          test "$(op descope '{"user":"CI","ref":"4.1","rationale":"no capacity"}')" = 422
+          # the Helios upload is refused while any in-plan row is incomplete
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8020/api/export/helios)" = 422
+          for what in plan approvals audit; do
+            curl -sf "http://127.0.0.1:8020/api/export/$what" -o "ci-$what.csv"
+          done
+          python - <<'PY'
+          import csv, json
+          plan = json.load(open("ci-plan.json", encoding="utf-8"))
+          assert plan["schema"] == 1
+          in_plan = [r for r in plan["reviews"] if r["staged"]]
+          assert len(in_plan) == 10, len(in_plan)
+          assert all(r["planned_quarter"] for r in in_plan), "waterfall left something unscheduled"
+          # every refusal above must have left no audit line, and every success exactly one
+          actions = [a["action"] for a in plan["audit"]]
+          assert actions == ["Quarters auto-filled", "Bulk staged"], actions
+          for what, header in [("plan", "Ref"), ("approvals", "Ref"), ("audit", "Timestamp")]:
+              raw = open(f"ci-{what}.csv", "rb").read()
+              raw.decode("utf-8")
+              assert b"\r\r\n" not in raw, what
+              rows = list(csv.reader(open(f"ci-{what}.csv", newline="", encoding="utf-8")))
+              assert rows[0][0] == header, (what, rows[0][:1])
+          PY
+
+      - name: The plan file survives a restart
+        run: |
+          python - <<'PY'
+          from helios.planning.store import Store
+          plan = Store("ci-plan.json").load()
+          assert len([r for r in plan.reviews if r.in_plan]) == 10
+          assert plan.review("4.1").planned_quarter.value == "Q1"
+          assert len(plan.audit) == 2
+          PY
 
   frontend:
     name: Frontend (typecheck, tests, build)

@@ -1,15 +1,19 @@
-# Helios bulk upload — CSV export
+# IAP Planning Module
 
-A lite app whose only job is to produce a **valid Helios bulk upload CSV**. It is a
-narrowed rebuild of the pre-staging tab from the MVP prototype
-(`2027_IAP_Planning_Module.html`), with the planning workflow around it left out.
+The planning workflow from the MVP prototype (`2027_IAP_Planning_Module.html`), rebuilt as
+a real application, ending in a **valid Helios bulk upload CSV**.
+
+Candidate reviews are scored, weighted and staged; the plan is fitted to FTE capacity and
+phased across quarters; each review passes one sign-off gate; then the Helios attributes
+are captured and exported. Every decision along the way is written to an audit trail.
 
 Standard library only — no pip install, no Poetry, no Node, no database. **Python 3.12**,
 the same interpreter `backend/` requires, so one machine setup runs the whole repository.
 
 ```bash
-python3 -m helios                          # http://127.0.0.1:8000
-python3 -m helios reviews.csv -o out.csv   # convert without opening a browser
+python3 -m helios                          # the planning module on http://127.0.0.1:8000
+python3 -m helios --data plans/2027.json   # keep the plan somewhere else
+python3 -m helios reviews.csv -o out.csv   # convert a CSV without opening a browser at all
 python3 -m unittest discover -s helios/tests -t .
 ```
 
@@ -28,9 +32,14 @@ CI runs the full suite on `windows-latest` as well as Linux, so "works on Window
 test result rather than an intention. See [Windows specifics](#windows-specifics) for what
 that covers.
 
-## What it does
+## The nine screens
 
-Five responsibilities, one per module. Nothing else is in scope.
+Risk Radar · Staging & capacity · Shaped plan · Approval · Pre-staging (Helios) ·
+Versions · Audit trail · Reference data · Phase 2 GenAI roadmap.
+
+## How it is laid out
+
+The export half — everything that turns a review into a Helios row:
 
 | Module | Responsibility |
 | --- | --- |
@@ -40,19 +49,60 @@ Five responsibilities, one per module. Nothing else is in scope.
 | `validation.py` | Required fields and allowed values, with explicit per-row errors |
 | `export.py` | The CSV itself |
 
-`server.py` is a thin HTTP layer over those and holds no rules of its own, so the file the
-browser downloads is byte-identical to the one the CLI writes.
+The planning half — everything upstream of it, in `planning/`:
 
-Deliberately **not** here: scoring, weighting, capacity and FTE modelling, SME allocation,
-staging, quarter scheduling, approval routing, plan versioning, audit trail, users and
-roles. Those live in `backend/` and are not needed to produce the CSV.
+| Module | Responsibility | Rules |
+| --- | --- | --- |
+| `scoring.py` | Weighted priority, overrides, bands | 2, 3, 5 |
+| `staging.py` | Staging and descoping | 4, 6 |
+| `capacity.py` | FTE demand against per-quarter capacity | 7, 8 |
+| `scheduling.py` | Waterfall Q1 → Q4 auto-fill | 9 |
+| `approval.py` | Routes, gates and sign-off | 10 |
+| `store.py` | The plan on disk, the audit trail, versions | 11 |
+| `actions.py` | Every mutation, each one audited | |
+| `views.py` | The JSON the screens render | |
+
+`server.py` is a thin HTTP layer over both halves and holds no rules of its own, so the
+file the browser downloads is byte-identical to the one the CLI writes. `views.py` computes
+every derived number the UI shows, so no rule is implemented twice.
+
+**SME-level resource allocation is deliberately absent.** The prototype's help text
+describes it, but its tabs implement FTE capacity only, and `PLAN.md` records the machinery
+as dropped. The tabs won.
 
 ## The pipeline
 
 ```
-approved reviews ──▶ mapping ──▶ normalisation ──▶ validation ──▶ CSV
-                    (columns)    (canonical)      (all or nothing)
+candidates ─▶ score & weight ─▶ stage ─▶ fit to capacity ─▶ phase ─▶ sign off ─▶ enrich ─▶ CSV
+              (read-only        (rule 6   (rules 7, 8)     (rule 9)  (rule 10)   (Helios)
+               facts, your       needs a
+               weights)          reason)
 ```
+
+### The rules worth knowing
+
+**Priority is normalised.** `(a·risk + b·urgency + c·coverage_gap + d·change) ÷ (a+b+c+d)`,
+so it stays on the 1–5 scale whatever the weights. The four scores are read-only facts from
+a separate scoring engine; the weights are the planner's only lever.
+
+**Mandated reviews are pinned.** They are not driver-scored, cannot be descoped, and hold
+the quarter their go-live date implies — the scheduler works around them.
+
+**Nothing leaves the plan silently.** Descoping needs a rationale, an override needs a
+rationale, returning a review at its gate needs a comment. A refused change writes no audit
+line, because it did not happen.
+
+**Capacity is FTE per quarter per function.** S/M/L needs 2/3/4 FTE unless overridden.
+Mandated demand commits first; the waterfall packs the earliest quarter with room and
+leaves what cannot fit unscheduled and flagged rather than squeezing it in.
+
+## The plan file
+
+One JSON document — reviews, weights, capacities, reference data, the audit trail and saved
+versions — written atomically (temp file, then `os.replace`, which is atomic on Windows
+too). The prototype used `localStorage`, which means the audit trail dies with the browser
+profile; a file survives, diffs in a review, and lets the CLI export exactly what the UI
+shows. `--data` chooses where it lives; delete it to start again.
 
 **Mapping.** A review arrives with whatever the planning side calls things — `ref`,
 `team`, `sub-team`, `go-live`, `rationale` — and comes out on Helios columns. Seed defaults
@@ -101,16 +151,31 @@ the written spec — if that turns out to be wrong, remove them from `spec.REQUI
 
 ## HTTP API
 
+The plan:
+
 | | |
 | --- | --- |
 | `GET /` | the single-page UI |
+| `GET /api/plan` | the whole plan, with every derived value the screens show |
+| `POST /api/op/<name>` | one named mutation, then the whole plan again |
+| `GET /api/prestaging/<ref>` | one review's Helios row: values and per-field errors |
+| `GET /api/export/<what>` | `helios` · `plan` · `approvals` · `audit` → a CSV download |
+| `POST /api/reset` | back to the seeded candidate list |
+
+Every mutation goes through a named op, so nothing can change the plan without an audit
+line. A refusal comes back `422` with the message shown verbatim to the planner.
+
+And the stateless CSV endpoints, which need no plan file at all:
+
+| | |
+| --- | --- |
 | `GET /api/spec` | columns, allowed values, reference lists, a blank row |
 | `POST /api/import` | `{"csv": "..."}` or `{"reviews": [...]}` → mapped rows + errors |
 | `POST /api/validate` | `{"rows": [...]}` → normalised rows + errors |
 | `POST /api/export` | `{"rows": [...]}` → the CSV, or `422` with the errors that stopped it |
 
-The UI keeps rows in `localStorage` and holds no validation logic of its own — every check
-is the server's, so what you see on screen is what the export will enforce.
+The UI holds no rules of its own — every check is the server's, so what is on screen is
+what the export will enforce.
 
 ## Windows specifics
 
@@ -143,7 +208,20 @@ the worst time to have one.
 
 ## Reference data
 
-`reference.py` holds the business and location lists. In production these come from the
-Helios KBD reference-data mapper; `LISTS` is where that feed lands. The closed lists that
-Helios owns outright (assurance functions, review teams, review types and categories) are
-in `spec.py`.
+The business, location and taxonomy lists are editable in the app and live in the plan
+file. In production they come from the Helios KBD reference-data mapper; `reference.LISTS`
+is where that feed lands, and the screen is the fallback until it exists. The closed lists
+Helios owns outright — assurance functions, review teams, review types and categories — are
+in `spec.py` and are not editable.
+
+Removing a value does not strip it from the reviews that carry it. Those reviews keep it
+and pre-staging then reports it as unrecognised: visible and fixable, rather than a silent
+edit to someone else's plan.
+
+## Relationship to `backend/`
+
+The rules in `planning/` mirror `backend/app/domain/`, which is also pure standard library.
+They are a port rather than an import on purpose: this app's value is that `python -m
+helios` needs nothing installed and no repository layout around it, and reaching across
+into `backend/` would give that up. The port is small enough to diff if the two ever have
+to agree, and if `backend/` is retired nothing here moves.

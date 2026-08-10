@@ -2,6 +2,7 @@
 
     python3 -m helios                          serve the UI on http://127.0.0.1:8000
     python3 -m helios --port 9000              serve on another port
+    python3 -m helios --data plans/2027.json   keep the plan somewhere else
     python3 -m helios reviews.csv              convert, writing the CSV to stdout
     python3 -m helios reviews.csv -o out.csv   convert, writing to a file
 """
@@ -21,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-o", "--out", help="write the Helios CSV here instead of stdout")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--data", default=str(server.DEFAULT_PATH),
+                        help="plan file to read and write (default: %(default)s)")
     args = parser.parse_args(argv)
 
     # Messages carry em dashes and ellipses. An older Windows console code page cannot
@@ -29,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.reconfigure(errors="replace")
 
     if args.source is None:
-        server.serve(args.host, args.port)
+        server.serve(args.host, args.port, args.data)
         return 0
 
     return convert(Path(args.source), Path(args.out) if args.out else None)
