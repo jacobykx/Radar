@@ -53,3 +53,7 @@ frontend/CLAUDE.md
 # build, so tracking it only produces churn. Verified that typecheck, jest and build all
 # pass on a checkout without it.
 frontend/next-env.d.ts
+
+# The Helios planning module's plan file — local working state, not source.
+iap-plan.json
+.iap-plan.json.*.tmp

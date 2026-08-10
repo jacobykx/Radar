@@ -22,6 +22,7 @@ endif
 
 .DEFAULT_GOAL := help
 .PHONY: help setup setup-backend setup-frontend env dev dev-backend dev-frontend \
+        helios test-helios \
         migrate migration seed reset test test-backend test-frontend lint typecheck \
         build check generate-api docker-up docker-down docker-seed clean
 
@@ -59,6 +60,9 @@ dev-backend: ## Run the API with reload
 dev-frontend: ## Run the Next dev server
 	cd $(FRONTEND) && npm run dev
 
+helios: ## Run the lite Helios CSV export app — no setup needed
+	python3 -m helios
+
 # ── database ───────────────────────────────────────────────────────────────────
 
 migrate: ## Apply migrations up to head
@@ -79,13 +83,16 @@ reset: ## Drop everything, re-migrate, re-seed
 
 check: lint typecheck test build ## Everything CI runs
 
-test: test-backend test-frontend ## Run both test suites
+test: test-backend test-frontend test-helios ## Run every test suite
 
 test-backend: ## pytest
 	cd $(BACKEND) && poetry run python -m pytest
 
 test-frontend: ## jest
 	cd $(FRONTEND) && npm test
+
+test-helios: ## unittest — stdlib only, nothing to install
+	python3 -m unittest discover -s helios/tests -t .
 
 lint: ## ruff
 	cd $(BACKEND) && poetry run ruff check .

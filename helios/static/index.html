@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IAP Planning Module — staging, capacity & Helios export</title>
+<style>
+  :root {
+    --bg:#f4f6fa; --panel:#fff; --border:#d8dee9; --ink:#1c2330; --muted:#5b6678;
+    --navy:#1f3864; --blue:#2e75b6; --blue-soft:#eaf1fb;
+    --crit:#8e2018; --high:#b03a2e; --med:#b8860b; --low:#3e7a3e;
+    --ok:#3e7a3e; --warn:#b8860b; --over:#b03a2e;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif; }
+  .wrap { max-width:1340px; margin:0 auto; padding:0 20px 64px; }
+  header.top { background:linear-gradient(180deg,var(--navy),#18406f); color:#fff;
+    margin:0 -20px 18px; padding:22px 28px 18px; }
+  header.top .kicker { font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    opacity:.8; margin-bottom:6px; }
+  header.top h1 { font-size:23px; margin:0 0 6px; letter-spacing:-.01em; }
+  header.top .meta { font-size:13px; opacity:.9; }
+  header.top .who { margin-top:12px; font-size:13px; display:flex; align-items:center;
+    gap:8px; flex-wrap:wrap; }
+  header.top .who input { padding:5px 9px; border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.12); color:#fff; border-radius:6px; font:inherit; font-size:13px; }
+  header.top .who input::placeholder { color:rgba(255,255,255,.6); }
+
+  .dashwrap { display:grid; grid-template-columns:2fr 1fr 1.2fr 1.2fr; gap:10px; margin-bottom:16px; }
+  .dashcard { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; }
+  .dashttl { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+    margin-bottom:10px; font-weight:600; }
+  .funnel { display:flex; align-items:center; gap:4px; }
+  .fstep { flex:1 1 auto; text-align:center; }
+  .fstep .fn { font-size:22px; font-weight:700; color:var(--navy); line-height:1; }
+  .fstep .fl { font-size:11px; color:var(--muted); margin-top:3px; }
+  .fsep { color:var(--border); font-size:16px; }
+  .donut { width:82px; height:82px; border-radius:50%; margin:0 auto; display:flex;
+    align-items:center; justify-content:center; position:relative;
+    background:conic-gradient(var(--blue) calc(var(--pct)*1%), #eef1f6 0); }
+  .donut::after { content:""; position:absolute; inset:11px; background:var(--panel);
+    border-radius:50%; }
+  .donut span { position:relative; z-index:1; font-size:17px; font-weight:700; color:var(--navy); }
+  .qbars { display:flex; align-items:flex-end; gap:10px; height:82px; }
+  .qb { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;
+    height:100%; }
+  .qbar { width:100%; background:var(--blue); border-radius:4px 4px 0 0; min-height:3px; }
+  .qbar.over { background:var(--over); }
+  .ql { font-size:11px; color:var(--muted); margin-top:3px; }
+  .qv { font-size:11px; font-weight:700; color:var(--navy); }
+  .attn { display:flex; flex-direction:column; gap:5px; }
+  .ai { font-size:12px; padding:5px 9px; border-radius:6px; }
+  .ai b { font-size:14px; margin-right:4px; }
+  .ai.good { background:#eef7ee; color:var(--low); } .ai.bad { background:#fbeeec; color:var(--over); }
+
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--border);
+    margin-bottom:18px; }
+  .tab { padding:9px 15px; border:none; background:transparent; font:inherit; color:var(--muted);
+    cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab.active { color:var(--navy); border-bottom-color:var(--blue); font-weight:600; }
+  .tab .pill { display:inline-block; min-width:17px; padding:0 5px; margin-left:5px; font-size:11px;
+    background:var(--over); color:#fff; border-radius:999px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:16px; margin-bottom:16px; }
+  .panel h3 { margin:0 0 12px; font-size:15px; color:var(--navy); }
+  .panel h3 .sub { font-weight:400; font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; }
+  th,td { padding:7px 9px; text-align:left; vertical-align:middle;
+    border-bottom:1px solid var(--border); font-size:13px; }
+  th { background:var(--navy); color:#fff; font-weight:600; font-size:11px; text-transform:uppercase;
+    letter-spacing:.03em; white-space:nowrap; }
+  th.sortable { cursor:pointer; } th.sortable:hover { background:#2a4a7a; }
+  tbody tr:hover td { background:#f7f9fc; }
+  tr.descoped td { opacity:.5; background:#f7f7f8; }
+  .band { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
+    white-space:nowrap; text-transform:uppercase; }
+  .band.Critical { background:#f6dcd8; color:var(--crit); }
+  .band.High { background:#fce8e6; color:var(--high); }
+  .band.Medium { background:#fdf2d9; color:var(--med); }
+  .band.Low { background:#e3f0e3; color:var(--low); }
+  .band.Mandated { background:#fdf2d9; color:#8e6b12; border:1px solid #eeddb0; }
+  .dom-pill { display:inline-block; font-size:10px; padding:2px 7px; border-radius:999px;
+    background:var(--blue-soft); color:var(--navy); white-space:nowrap; }
+  .star { color:#b8860b; font-weight:700; }
+  .sc { display:inline-block; width:22px; text-align:center; font-weight:600; border-radius:4px;
+    font-size:12px; padding:1px 0; }
+  .sc.s5 { background:#f6dcd8; color:var(--crit); } .sc.s4 { background:#fce8e6; color:var(--high); }
+  .sc.s3 { background:#fdf2d9; color:var(--med); } .sc.s2,.sc.s1 { background:#eef3ee; color:var(--low); }
+  .origin { display:inline-block; font-size:10.5px; font-weight:600; padding:2px 7px;
+    border-radius:999px; white-space:nowrap; }
+  .origin.o-reg { background:#fdf2d9; color:#8e6b12; border:1px solid #eeddb0; }
+  .origin.o-risk { background:var(--blue-soft); color:var(--navy); border:1px solid #b9cbe6; }
+  .origin.o-radar { background:#eef7ee; color:var(--low); border:1px solid #bcdcbc; }
+  .appr { display:inline-block; font-size:10.5px; font-weight:600; padding:2px 8px;
+    border-radius:999px; white-space:nowrap; }
+  .appr.Approved { background:#eef7ee; color:var(--low); border:1px solid #bcdcbc; }
+  .appr.Returned { background:#fbeeec; color:var(--over); border:1px solid #e6c9c4; }
+  .appr.Pending { background:#f1efe8; color:var(--muted); border:1px solid var(--border); }
+  .btn { font:inherit; font-size:13px; padding:6px 12px; border:1px solid var(--blue);
+    background:#fff; color:var(--blue); border-radius:6px; cursor:pointer; }
+  .btn:hover { background:var(--blue-soft); }
+  .btn.primary { background:var(--blue); color:#fff; } .btn.primary:hover { background:#245e94; }
+  .btn.ghost { border-color:var(--border); color:var(--muted); }
+  .btn.sm { font-size:12px; padding:3px 8px; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .rowactions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .muted { color:var(--muted); } .small { font-size:12px; }
+  select,input[type=text],input[type=number],input[type=date],textarea {
+    font:inherit; font-size:13px; padding:5px 7px; border:1px solid var(--border);
+    border-radius:6px; background:#fff; }
+  textarea { width:100%; min-height:44px; resize:vertical; }
+  .weights { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+  .wt { flex:1 1 150px; } .wt label { display:block; font-size:12px; color:var(--muted);
+    margin-bottom:4px; } .wt label b { color:var(--ink); }
+  .wt input[type=range] { width:100%; accent-color:var(--blue); }
+  .wt .val { font-size:12px; color:var(--blue); font-weight:600; }
+  details.help { margin-bottom:14px; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:4px 14px; }
+  details.help summary { cursor:pointer; font-weight:600; color:var(--navy); padding:8px 0;
+    font-size:14px; }
+  details.help > div { padding-bottom:12px; font-size:13px; }
+  .addgrid { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; padding:4px 0 8px; }
+  .af { display:flex; flex-direction:column; gap:3px; }
+  .af label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .af.wide { flex:1 1 300px; } .af.wide input { width:100%; }
+  .af.sc input { width:56px; text-align:center; }
+  .cap-row { display:grid; grid-template-columns:220px 1fr 110px; gap:12px; align-items:center;
+    padding:7px 0; border-bottom:1px solid var(--border); }
+  .cap-row .name { font-size:13px; } .cap-row .name small { color:var(--muted); display:block;
+    font-size:11px; }
+  .qgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .qcell { border:1px solid var(--border); border-radius:6px; padding:5px 7px; font-size:12px; }
+  .qcell.over { border-color:#e6c9c4; background:#fbeeec; color:var(--over); }
+  .qcell b { color:var(--navy); } .qcell.over b { color:var(--over); }
+  .bar { height:15px; background:#eef1f6; border-radius:8px; overflow:hidden; }
+  .bar > span { display:block; height:100%; border-radius:8px; background:var(--ok); }
+  .bar.warn > span { background:var(--warn); } .bar.over > span { background:var(--over); }
+  .note { background:#fffbea; border:1px solid #f0e2a5; border-radius:8px; padding:9px 12px;
+    font-size:13px; margin-bottom:14px; color:#6b5a16; }
+  .note.err { background:#fbeeec; border-color:#e6c9c4; color:#7a2a20; }
+  .note.ok { background:#eef7ee; border-color:#bcdcbc; color:#2c5a2c; }
+  .hs-panel { border:1px solid var(--border); border-radius:10px; margin-bottom:10px;
+    background:var(--panel); overflow:hidden; }
+  .hs-head { display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:11px 14px; cursor:pointer; }
+  .hs-head:hover { background:#fafbfd; }
+  .hs-grid { padding:12px 14px; display:grid; grid-template-columns:1fr 1fr; gap:10px 16px;
+    border-top:1px solid var(--border); }
+  .hs-f { display:flex; flex-direction:column; gap:3px; padding-left:8px; }
+  .hs-f.g-existing { border-left:3px solid var(--ok); }
+  .hs-f.g-change { border-left:3px solid var(--warn); }
+  .hs-f.g-system { border-left:3px solid var(--blue); }
+  .hs-f.full { grid-column:1/-1; }
+  .hs-f label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .hs-f .hint { font-size:10px; color:#9aa4b2; text-transform:none; letter-spacing:0; margin-left:5px; }
+  .hs-f .req { color:var(--over); }
+  .hs-f input,.hs-f select,.hs-f textarea { width:100%; }
+  .hs-f .derived { font-size:13px; padding:6px 7px; background:#eef3fb; border:1px dashed #b9cbe6;
+    border-radius:6px; color:var(--navy); }
+  .hs-f.bad input,.hs-f.bad select,.hs-f.bad textarea { border-color:var(--over); background:#fdf7f6; }
+  .hs-f .msg { font-size:11px; color:var(--over); }
+  .cbadge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600; }
+  .cbadge.ok { background:#eef7ee; color:var(--ok); border:1px solid #bcdcbc; }
+  .cbadge.no { background:#fdf2d9; color:var(--warn); border:1px solid #eeddb0; }
+  .locchip { display:inline-flex; align-items:center; gap:3px; font-size:10.5px; padding:1px 5px;
+    margin:0 3px 3px 0; border-radius:999px; background:var(--blue-soft); color:var(--navy);
+    border:1px solid #b9cbe6; white-space:nowrap; }
+  .locchip button { border:none; background:none; color:var(--blue); cursor:pointer; font-size:10px;
+    padding:0; line-height:1; }
+  .rris { display:inline-block; font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:4px;
+    background:#fdf2d9; color:#8e6b12; border:1px solid #eeddb0; margin:0 3px 2px 0; }
+  .plan-dom { margin-bottom:18px; }
+  .plan-dom h4 { color:var(--navy); font-size:14px; border-bottom:2px solid var(--blue-soft);
+    padding-bottom:5px; margin:0 0 8px; }
+  .plan-item { padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .plan-item .m { color:var(--muted); font-size:12px; margin-top:2px; }
+  .gengrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .gencard { border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .gencard h4 { margin:0 0 4px; color:var(--navy); font-size:14px; }
+  .gencard .where { font-size:10px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.05em; margin-bottom:8px; }
+  .gentag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:999px;
+    margin:2px 4px 0 0; font-weight:600; }
+  .gentag.a { background:#e3f0e3; color:var(--low); } .gentag.b { background:#fdf2d9; color:var(--warn); }
+  .gentag.c { background:var(--blue-soft); color:var(--blue); }
+  .refgrid { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:12px; }
+  .refgrid textarea { min-height:220px; font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px; }
+  .toast { position:fixed; right:18px; bottom:18px; z-index:50; max-width:420px; padding:10px 14px;
+    border-radius:8px; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,.16); display:none; }
+  .toast.show { display:block; }
+  .toast.err { background:#fbeeec; border:1px solid #e6c9c4; color:#7a2a20; }
+  .toast.ok { background:#eef7ee; border:1px solid #bcdcbc; color:#2c5a2c; }
+  footer.bottom { margin-top:26px; padding-top:14px; border-top:1px solid var(--border);
+    font-size:12px; color:var(--muted); }
+  @media(max-width:1100px){ .dashwrap{grid-template-columns:1fr 1fr} .refgrid{grid-template-columns:1fr}
+    .gengrid{grid-template-columns:1fr} .hs-grid{grid-template-columns:1fr} }
+  /* --- inline row editing, as the prototype's dense table does it --- */
+  #backlogTable th, #backlogTable td { padding:5px 6px; font-size:12px; }
+  #backlogTable .dom-pill { font-size:10px; padding:2px 6px; }
+  .sccell { position:relative; text-align:center; }
+  .scin { width:38px; text-align:center; font:inherit; font-size:12px; font-weight:600;
+    padding:2px 0; border:1px solid transparent; border-radius:4px; }
+  .scin:hover, .scin:focus { border-color:var(--blue); outline:none; }
+  .scin.s5 { background:#f6dcd8; color:var(--crit); } .scin.s4 { background:#fce8e6; color:var(--high); }
+  .scin.s3 { background:#fdf2d9; color:var(--med); }
+  .scin.s2, .scin.s1 { background:#eef3ee; color:var(--low); }
+  .sccell.changed { box-shadow:inset 0 0 0 2px var(--blue); border-radius:5px; }
+  .chgdot { position:absolute; top:0; right:3px; color:var(--blue); font-size:15px; line-height:1; }
+  .prioin { width:58px; text-align:center; padding:3px 4px; border:1px solid var(--border);
+    border-radius:5px; font:inherit; font-size:12px; font-weight:700; color:var(--navy); }
+  .prioin:hover, .prioin:focus { border-color:var(--blue); outline:none; }
+  .prioin.ovr { border-color:var(--blue); background:var(--blue-soft); }
+  .prioin.pend { border-color:var(--warn); background:#fffbea; }
+  .composite { font-weight:700; color:var(--navy); }
+  .txin { width:100%; max-width:130px; padding:3px 5px; border:1px solid var(--border);
+    border-radius:5px; font:inherit; font-size:11px; }
+  .txin:hover, .txin:focus { border-color:var(--blue); outline:none; }
+  .effsel { padding:3px 4px; border:1px solid var(--border); border-radius:5px; font:inherit;
+    font-size:11px; background:#fff; }
+  .colfilt { display:block; margin-top:4px; max-width:110px; font:inherit; font-size:10px;
+    font-weight:400; padding:2px 3px; border:1px solid rgba(255,255,255,.4); border-radius:4px;
+    background:rgba(255,255,255,.14); color:#fff; text-transform:none; letter-spacing:0; }
+  .colfilt option { color:var(--ink); }
+  .flagchip { font-size:11px; padding:2px 7px; border-radius:999px; background:#fbeeec;
+    color:var(--over); border:1px solid #e6c9c4; }
+  .descope-tag { font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:999px;
+    background:#ecebe6; color:var(--muted); border:1px solid var(--border); }
+  .stew { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px;
+    border-radius:999px; margin-top:3px; white-space:nowrap; }
+  .stew.ok { background:#eef7ee; color:var(--low); border:1px solid #bcdcbc; }
+  .stew.no { background:#fdf2d9; color:#8e6b12; border:1px solid #eeddb0; }
+  .origin-cell { vertical-align:top; white-space:nowrap; }
+  .loc-cell { vertical-align:top; min-width:130px; }
+  .locadd { max-width:120px; font-size:10px; margin-top:2px; }
+  .rmrev { cursor:pointer; border:none; background:none; color:var(--over); font-size:13px; }
+  tr.detail td { background:#f7f9fc !important; padding:0; border-bottom:2px solid var(--border); }
+  tr.detail .dwrap { padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  tr.detail .box h5 { margin:0 0 6px; font-size:11px; text-transform:uppercase;
+    letter-spacing:.06em; color:var(--muted); }
+  tr.detail .box.full { grid-column:1 / -1; }
+  .pendbox { background:#fffbea; border:1px solid #f0e2a5; border-radius:8px; padding:10px 12px; }
+  .pendbox b { color:#6b5a16; font-size:13px; }
+  .commentlog .c { font-size:12px; padding:5px 8px; background:#fff; border:1px solid var(--border);
+    border-radius:6px; margin-bottom:4px; }
+  .commentlog .c .meta { color:var(--muted); font-size:11px; }
+  .teamsel, .subsel { font:inherit; font-size:13px; padding:5px 9px; border:1px solid var(--blue);
+    border-radius:6px; background:var(--blue-soft); color:var(--navy); font-weight:600; }
+  .subsel { border-color:var(--warn); background:#fdf2d9; color:#8e6b12; }
+  @media(max-width:900px){ tr.detail .dwrap { grid-template-columns:1fr; } }
+  .gate { border:1px solid var(--border); background:var(--panel); border-radius:8px; padding:10px 12px; }
+  .sgnnote { width:100%; min-height:38px; padding:6px; border:1px solid var(--border);
+    border-radius:6px; font:inherit; font-size:12px; resize:vertical; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">Indicative Annual Planning · Planning Module</div>
+  <h1>IAP Planning, Staging &amp; Helios Export</h1>
+  <div class="meta"><strong>UK GSIB — illustrative</strong> · consolidate, shape (capacity ·
+    priority · dedup), approve, and produce the Helios bulk upload.</div>
+  <div class="who">Working as:
+    <input id="user" placeholder="your name — recorded on the audit trail" />
+    <span class="muted small" style="color:rgba(255,255,255,.75)">every staging decision,
+      override and sign-off is logged against this name</span>
+  </div>
+</header>
+
+<div class="dashwrap" id="dash"></div>
+
+<div class="tabs" id="tabs"></div>
+<div id="view"></div>
+
+<footer class="bottom">
+  IAP planning module · four-driver methodology, FTE capacity, one sign-off gate per review,
+  and a Helios bulk upload that is refused until every row is valid.
+  The plan lives in a JSON file beside the app.
+</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================ helpers */
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = (v, d = 2) => (v == null ? "—" : Number(v).toFixed(d));
+
+let plan = null;      // the whole payload from /api/plan
+let spec = null;      // the Helios column spec
+let tab = "radar";
+let user = localStorage.getItem("iap_user") || "";
+const open = { radar: new Set(), pre: new Set(), appr: new Set() };
+let filters = { team: "", sub: "", business: "", location: "", route: "", status: "" };
+let sort = { key: "priority", dir: -1 };
+
+function toast(text, kind = "err") {
+  const el = $("#toast");
+  el.className = `toast show ${kind}`;
+  el.textContent = text;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => (el.className = "toast"), 6000);
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user, ...body }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { toast(data.error || `Request failed (${res.status}).`); return null; }
+  return data;
+}
+
+/** Every mutation goes through here: one named op, and the whole plan comes back. */
+async function op(name, body = {}) {
+  const data = await api(`/api/op/${name}`, body);
+  if (data) { plan = data; render(); }
+  return data;
+}
+
+const reviews = () => plan.reviews;
+const inPlan = () => plan.reviews.filter((r) => r.in_plan);
+const byRef = (ref) => plan.reviews.find((r) => r.ref === ref);
+
+function matches(r) {
+  return (!filters.team || r.assurance_function === filters.team)
+    && (!filters.sub || r.sub_team === filters.sub)
+    && (!filters.business || r.business === filters.business)
+    && (!filters.location || r.locations.includes(filters.location));
+}
+
+function download(path) { window.location.href = path; }
+
+/* ============================================================ header */
+function renderDash() {
+  const s = plan.stats;
+  const funnel = [
+    [s.candidates, "Candidates"], [s.in_plan, "In scope"], [s.descoped, "Descoped"],
+    [s.scheduled, "Scheduled"], [s.approved, "Approved"], [s.helios_ready, "Helios ready"],
+  ];
+  const qmax = Math.max(s.quarter_capacity, ...Object.values(s.quarter_fte)) || 1;
+
+  $("#dash").innerHTML = `
+    <div class="dashcard">
+      <div class="dashttl">Plan funnel</div>
+      <div class="funnel">${funnel.map(([n, l], i) =>
+        `${i ? '<span class="fsep">›</span>' : ""}
+         <div class="fstep"><div class="fn">${n}</div><div class="fl">${l}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="dashcard">
+      <div class="dashttl">FTE utilisation</div>
+      <div class="donut" style="--pct:${Math.min(100, s.utilisation)}"><span>${s.utilisation}%</span></div>
+      <div class="muted small" style="text-align:center;margin-top:6px">
+        ${s.fill.mandated_fte + s.fill.additional_fte} of ${s.fill.annual_fte_quarters} FTE-quarters</div>
+    </div>
+    <div class="dashcard">
+      <div class="dashttl">FTE by quarter <span class="muted">· capacity ${s.quarter_capacity}</span></div>
+      <div class="qbars">${Object.entries(s.quarter_fte).map(([q, v]) => `
+        <div class="qb"><div class="qv">${v}</div>
+          <div class="qbar ${v > s.quarter_capacity ? "over" : ""}"
+               style="height:${Math.round((v / qmax) * 100)}%"></div>
+          <div class="ql">${q}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="dashcard">
+      <div class="dashttl">Needs attention</div>
+      <div class="attn">
+        <div class="ai ${s.outstanding_rationales ? "bad" : "good"}">
+          <b>${s.outstanding_rationales}</b> without a rationale</div>
+        <div class="ai ${s.unscheduled ? "bad" : "good"}"><b>${s.unscheduled}</b> unscheduled</div>
+        <div class="ai ${s.in_plan - s.helios_ready ? "bad" : "good"}">
+          <b>${s.in_plan - s.helios_ready}</b> not Helios-ready</div>
+        <div class="ai ${s.fill.over ? "bad" : "good"}">
+          <b>${s.fill.headroom}</b> FTE-quarters headroom</div>
+      </div>
+    </div>`;
+}
+
+const TABS = [
+  ["radar", "Risk Radar"], ["staging", "Staging &amp; capacity"], ["plan", "Shaped plan"],
+  ["approval", "Approval"], ["pre", "Pre-staging (Helios)"], ["versions", "Versions"],
+  ["audit", "Audit trail"], ["reference", "Reference data"], ["genai", "Phase 2: GenAI"],
+];
+
+function renderTabs() {
+  const badges = {
+    radar: plan.stats.outstanding_rationales,
+    pre: plan.stats.in_plan - plan.stats.helios_ready,
+  };
+  $("#tabs").innerHTML = TABS.map(([k, label]) =>
+    `<button class="tab ${k === tab ? "active" : ""}" data-tab="${k}">${label}` +
+    (badges[k] ? `<span class="pill">${badges[k]}</span>` : "") + `</button>`).join("");
+  $("#tabs").querySelectorAll("[data-tab]").forEach((b) => {
+    b.onclick = () => { tab = b.dataset.tab; render(); };
+  });
+}
+
+/* ============================================================ Risk Radar */
+/* Follows the prototype: the table is the workspace. Scores, priority, business,
+   location and effort are all edited in the row; the drawer is for rationale and notes. */
+
+let pendingPrio = {};   // ref -> priority awaiting its rationale, as the prototype does
+
+function teamOptions() {
+  return [...new Set(reviews().map((r) => r.assurance_function))].sort();
+}
+function subTeamOptions() {
+  const subs = plan.options.sub_teams[filters.team];
+  return subs ? [...subs] : [];
+}
+
+function filterBar() {
+  const sel = (key, label, list, cls) => `<label class="small">${label}
+    <select data-filter="${key}" class="${cls || ""}">
+      <option value="">All ${label.toLowerCase()}s</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select></label>`;
+  const subs = subTeamOptions();
+  return sel("team", "Team", teamOptions(), "teamsel")
+    + (subs.length ? sel("sub", "Sub-team", subs, "subsel") : "");
+}
+
+/** Mandated reviews are pinned to the top whatever the sort, as in the prototype. */
+function sortedRadar() {
+  const key = sort.key;
+  const val = (r) => key === "priority" ? (r.effective_priority ?? 0)
+    : key === "effort" ? r.fte
+    : key === "ref" ? r.ref
+    : (r.scores ? r.scores[key] : 0);
+  return reviews().filter(matches).sort((a, b) => {
+    if (a.mandated !== b.mandated) return a.mandated ? -1 : 1;
+    const x = val(a), y = val(b);
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sort.dir;
+  });
+}
+
+function scoreCell(r, key) {
+  if (!r.scores) return `<td class="sccell"><span class="muted">—</span></td>`;
+  const v = r.scores[key];
+  const changed = (r.scores_edited || []).includes(key);
+  const was = changed ? ` — scoring engine said ${r.seeded_scores[key]}` : "";
+  return `<td class="sccell ${changed ? "changed" : ""}">
+    <input class="scin s${Math.round(v)}" type="number" min="1" max="5" step="0.5"
+      value="${v}" data-score="${r.ref}|${key}"
+      title="${esc(plan.options.drivers.find((d) => d.key === key).label)}${was}" />
+    ${changed ? '<span class="chgdot" title="edited by hand">•</span>' : ""}</td>`;
+}
+
+function originCell(r) {
+  const cls = r.origin === "Regulatory Assurance" ? "o-reg"
+    : r.origin === "Risk Assurance" ? "o-risk" : "o-radar";
+  const steward = r.origin === "Risk Radar inputs"
+    ? `<div class="stew ${r.steward_consulted ? "ok" : "no"}"
+         title="${r.steward_consulted ? "Steward consulted — " + esc(r.steward_name) : "Risk steward not yet consulted"}"
+       >${r.steward_consulted ? "✓ " + esc(r.steward_name || "steward") : "steward?"}</div>` : "";
+  return `<td class="origin-cell"><span class="origin ${cls}">${esc(r.origin)}</span>${steward}</td>`;
+}
+
+function locCell(r) {
+  const spare = plan.options.locations.filter((l) => !r.locations.includes(l));
+  return `<td class="loc-cell">
+    ${r.locations.map((l) => `<span class="locchip">${esc(l)}<button class="lx"
+        data-locrm="${r.ref}|${esc(l)}" title="remove">✕</button></span>`).join("")}
+    <select class="txin locadd" data-locadd="${r.ref}">
+      <option value="">+ add…</option>
+      ${spare.map((l) => `<option>${esc(l)}</option>`).join("")}
+    </select></td>`;
+}
+
+function effortSelect(r) {
+  return `<select class="effsel" data-size="${r.ref}" title="Effort size">
+    ${plan.options.sizes.map((s) => `<option value="${s.value}" ${s.value === r.effort_size ? "selected" : ""}
+      >${s.value} · ${s.days}d</option>`).join("")}</select>`;
+}
+
+function renderRadar() {
+  const w = plan.weights;
+  const rows = sortedRadar();
+  const head = (k, label) => `<th class="sortable" data-sort="${k}">${label}${
+    sort.key === k ? (sort.dir < 0 ? " ▼" : " ▲") : ""}</th>`;
+  const colFilter = (key, list) => `<select data-filter="${key}" class="colfilt">
+      <option value="">all</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select>`;
+
+  return `
+  <details class="help">
+    <summary>How to use this tool</summary>
+    <div>
+      <ol>
+        <li><b>Risk Radar</b> — candidates scored on four factors. Set the <b>weights</b> to
+          reflect what matters most; priority = a·Risk + b·Urgency + c·Coverage gap + d·Change.
+          Edit a score or a priority in the row — a priority override needs a rationale.
+          Mandated reviews (★) are pinned to the top and are not scored.</li>
+        <li><b>Staging &amp; capacity</b> — fit the plan to FTE per quarter and phase it Q1→Q4.</li>
+        <li><b>Approval</b> — one sign-off gate per review, routed IRR / RCA / standard.</li>
+        <li><b>Pre-staging</b> — capture the Helios attributes and export the bulk upload.</li>
+        <li><b>Audit trail</b> — every decision, against the name in the header.</li>
+      </ol>
+      <p class="muted">Un-staging a review takes effect at once and opens the drawer for a
+        reason. Until one is recorded the review is flagged <b>reason req.</b> and counted
+        on the tab.</p>
+    </div>
+  </details>
+
+  <details class="help">
+    <summary>⚖ Priority weights <span class="muted small" style="font-weight:400">— the four
+      scores come from the scoring engine; the weights are your lever</span></summary>
+    <div>
+      <div class="weights">${plan.options.drivers.map(({ key, label }) => `
+        <div class="wt">
+          <label><b>${label}</b> <span class="val">${w[key].toFixed(1)}</span></label>
+          <input type="range" min="0" max="3" step="0.1" value="${w[key]}" data-weight="${key}" />
+        </div>`).join("")}
+      </div>
+      <div style="margin-top:10px"><button class="btn ghost" id="w-reset">Reset to equal weighting</button></div>
+    </div>
+  </details>
+
+  <details class="help">
+    <summary>➕ Regulatory Assurance <span class="muted small" style="font-weight:400">— externally
+      mandated, pinned into the plan</span></summary>
+    <div>${addForm(true)}</div>
+  </details>
+  <details class="help">
+    <summary>➕ Risk Assurance <span class="muted small" style="font-weight:400">— risk-led
+      candidate, scored and queued</span></summary>
+    <div>${addForm(false)}</div>
+  </details>
+
+  <div class="rowactions">
+    ${filterBar()}
+    <button class="btn" id="stage-high">Stage all Critical + High</button>
+    <button class="btn ghost" id="stage-clear">Clear staging (keep mandated)</button>
+    <span class="muted small">★ mandated reviews are pinned to the top. Effective priority
+      reflects your overrides.</span>
+  </div>
+
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table id="backlogTable"><thead><tr>
+      <th>Stage</th><th></th>${head("ref", "Ref")}<th>Candidate review</th><th>Risk taxonomy</th>
+      ${head("risk", "Risk")}${head("urgency", "Urgency")}${head("coverage_gap", "Coverage")}
+      ${head("change", "Change")}${head("priority", "Priority")}
+      <th>Origin</th><th>Team</th>
+      <th>Business${colFilter("business", plan.options.businesses)}</th>
+      <th>Location${colFilter("location", plan.options.locations)}</th>
+      ${head("effort", "Effort")}<th></th>
+    </tr></thead><tbody>${rows.map(radarRow).join("")
+      || '<tr><td colspan="16" class="muted">No reviews match these filters.</td></tr>'}
+    </tbody></table>
+  </div>`;
+}
+
+function radarRow(r) {
+  const isOpen = open.radar.has(r.ref);
+  const pending = pendingPrio[r.ref];
+  const flag = r.rationale_outstanding
+    ? ' <span class="flagchip">reason req.</span>'
+    : (r.descoped ? ' <span class="descope-tag">descoped</span>' : "");
+  const prioCls = pending != null ? "pend" : (r.priority_override != null ? "ovr" : "");
+  const prioTitle = r.priority_override != null
+    ? `overridden — computed ${num(r.computed_priority)}`
+    : "computed priority — edit to override (rationale required)";
+
+  const main = `<tr class="${r.descoped || r.rationale_outstanding ? "descoped" : ""}">
+    <td><input type="checkbox" data-stage="${r.ref}" ${r.staged ? "checked" : ""}
+        title="${r.mandated ? "Mandated — taking it out needs a rationale" : "In the plan"}" /></td>
+    <td><button class="btn sm ghost" data-toggle="${r.ref}" title="Notes, descope &amp; rationale"
+        >${isOpen ? "▴" : "▾"}</button></td>
+    <td class="composite">${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</td>
+    <td>${esc(r.title)}${r.go_live ? ` <span class="muted small">· live ${esc(r.go_live)}</span>` : ""}${flag}
+      ${r.comment_count ? `<span class="muted small"> 💬${r.comment_count}</span>` : ""}</td>
+    <td><span class="dom-pill" title="${esc(r.taxonomy_label)}">${esc(r.taxonomy_short)}</span></td>
+    ${scoreCell(r, "risk")}${scoreCell(r, "urgency")}${scoreCell(r, "coverage_gap")}${scoreCell(r, "change")}
+    <td class="composite">${r.mandated ? '<span class="muted">—</span>'
+      : `<input class="prioin ${prioCls}" type="number" step="0.1" min="0" max="5"
+           value="${(pending != null ? pending : (r.effective_priority ?? 0)).toFixed(2)}"
+           data-prio="${r.ref}" title="${esc(prioTitle)}" />`}</td>
+    ${originCell(r)}
+    <td class="small team-cell" title="${esc(r.assurance_function)}${r.sub_team ? " · " + esc(r.sub_team) : ""}"
+      >${esc(r.function_short)}${r.sub_team ? `<div class="muted" style="font-size:11px">${esc(r.sub_team)}</div>` : ""}</td>
+    <td class="small"><select class="txin" data-business="${r.ref}">
+      <option value="">—</option>
+      ${plan.options.businesses.map((b) => `<option ${r.business === b ? "selected" : ""}>${esc(b)}</option>`).join("")}
+    </select></td>
+    ${locCell(r)}
+    <td class="small">${effortSelect(r)}</td>
+    <td>${r.ref.startsWith("EXT-") || r.ref.startsWith("RSK-")
+      ? `<button class="rmrev" data-rmrev="${r.ref}" title="Remove this review">✕</button>` : ""}</td>
+  </tr>`;
+
+  return main + (isOpen ? detailRow(r) : "");
+}
+
+function detailRow(r) {
+  const pending = pendingPrio[r.ref];
+  return `<tr class="detail"><td colspan="16"><div class="dwrap">
+    ${pending != null ? `<div class="box full pendbox">
+      <b>Priority override ${num(r.computed_priority)} → ${pending.toFixed(2)} — why?</b>
+      <textarea data-prio-why="${r.ref}" placeholder="Rationale — recorded against the review and the audit trail"></textarea>
+      <div class="rowactions" style="margin:8px 0 0">
+        <button class="btn sm primary" data-prio-confirm="${r.ref}">Confirm override</button>
+        <button class="btn sm ghost" data-prio-cancel="${r.ref}">Cancel</button>
+      </div></div>` : ""}
+
+    <div class="box">
+      <h5>${r.staged ? "Descope rationale" : "Why is this review not in the plan?"}</h5>
+      <textarea data-reason="${r.ref}" placeholder="Recorded against the review and the audit trail"
+        >${esc(r.descope_rationale)}</textarea>
+      <div class="rowactions" style="margin:6px 0 0">
+        <button class="btn sm" data-reason-save="${r.ref}">Save reason</button>
+        ${r.priority_override != null
+          ? `<button class="btn sm ghost" data-prio-reset="${r.ref}">Reset priority to computed</button>` : ""}
+        ${(r.scores_edited || []).length
+          ? `<button class="btn sm ghost" data-score-reset="${r.ref}">Reset scores</button>` : ""}
+      </div>
+      ${r.priority_rationale
+        ? `<div class="muted small" style="margin-top:6px">Override rationale: ${esc(r.priority_rationale)}</div>` : ""}
+    </div>
+
+    <div class="box">
+      <h5>Notes</h5>
+      <div class="commentlog">${r.comments.map((c) => `<div class="c">${esc(c.text)}
+        <div class="meta">${esc(c.user)} · ${esc((c.at || "").slice(0, 16).replace("T", " "))}</div></div>`).join("")
+        || '<span class="muted small">none</span>'}</div>
+      <div class="rowactions" style="margin:6px 0 0">
+        <input type="text" data-note="${r.ref}" placeholder="add a note" style="flex:1 1 200px" />
+        <button class="btn sm" data-note-add="${r.ref}">Add</button>
+      </div>
+      ${r.origin === "Risk Radar inputs" ? `<div class="rowactions" style="margin:6px 0 0">
+        <input type="text" data-stew="${r.ref}" placeholder="risk steward consulted"
+               value="${esc(r.steward_name)}" style="flex:1 1 200px" />
+        <button class="btn sm" data-stew-set="${r.ref}">Record steward</button></div>` : ""}
+    </div>
+  </div></td></tr>`;
+}
+
+function addForm(mandated) {
+  const p = mandated ? "ar" : "am";
+  return `<div class="addgrid">
+    <div class="af"><label>Risk taxonomy</label><select id="${p}-tax">
+      ${plan.options.taxonomy.map((t) => `<option value="${esc(t.code)}">${esc(t.label)}</option>`).join("")}
+    </select></div>
+    <div class="af wide"><label>Review title</label><input type="text" id="${p}-title" /></div>
+    <div class="af"><label>Assurance function</label><select id="${p}-fn">
+      ${plan.options.functions.map((f) => `<option>${esc(f.name)}</option>`).join("")}
+    </select></div>
+    <div class="af"><label>Sub-team</label><input type="text" id="${p}-sub" /></div>
+    <div class="af"><label>Effort</label><select id="${p}-size">
+      ${plan.options.sizes.map((s) => `<option value="${s.value}" ${s.value === "M" ? "selected" : ""}>
+        ${s.value} · ${s.days}d · ${s.fte} FTE</option>`).join("")}
+    </select></div>
+  </div>
+  ${mandated ? `<div class="addgrid">
+    <div class="af"><label>Regulator</label><input type="text" id="ar-reg" placeholder="PRA / FCA" /></div>
+    <div class="af wide"><label>Regulation / obligation</label><input type="text" id="ar-obl" /></div>
+    <div class="af"><label>RRIS ID(s)</label><input type="text" id="ar-rris" /></div>
+    <div class="af"><label>Go-live</label><input type="text" id="ar-go" placeholder="18 Mar 2027" /></div>
+  </div>` : `<div class="addgrid">
+    ${plan.options.drivers.map(({ key, label }) =>
+      `<div class="af sc"><label>${label}</label><input type="number" id="am-${key}" min="1" max="5"
+        step="0.5" value="3" /></div>`).join("")}
+  </div>`}
+  <div class="af" style="margin-top:8px"><label>Rationale (required)</label>
+    <textarea id="${p}-why"></textarea></div>
+  <div style="margin-top:8px"><button class="btn primary" data-add="${mandated ? 1 : 0}">
+    Add ${mandated ? "mandated" : "risk-led"} review</button></div>`;
+}
+
+/* ============================================================ Staging & capacity */
+function renderStaging() {
+  const c = plan.capacity;
+  const f = c.fill;
+  return `
+  <div class="panel">
+    <h3>Bottom-up capacity fill <span class="sub">— mandated reviews (★) commit capacity first;
+      the rest fill what remains. S = 2 · M = 3 · L = 4 FTE.</span></h3>
+    <div class="rowactions">
+      ${filterBar()}
+      <button class="btn" id="waterfall">Auto-fill quarters (waterfall Q1→Q4)</button>
+      <button class="btn ghost" id="qclear">Clear quarters</button>
+      <span class="muted small">${f.annual_fte_quarters} FTE-quarters a year ·
+        ${f.mandated_fte} committed to mandated · ${f.additional_fte} to the rest ·
+        <b style="color:${f.over ? "var(--over)" : "var(--ok)"}">${f.headroom}</b> headroom</span>
+    </div>
+    <div class="bar ${f.over ? "over" : f.headroom < f.annual_fte_quarters * 0.15 ? "warn" : ""}">
+      <span style="width:${Math.min(100, Math.round(
+        100 * (f.mandated_fte + f.additional_fte) / (f.annual_fte_quarters || 1)))}%"></span></div>
+  </div>
+
+  <div class="panel">
+    <h3>Quarterly FTE demand vs capacity <span class="sub">— reviews in a quarter draw their FTE
+      concurrently; capacity is the function's FTE per quarter.</span></h3>
+    ${c.functions.map((fn) => `
+      <div class="cap-row">
+        <div class="name">${esc(fn.function)}
+          <small>${fn.fte_per_quarter} FTE/quarter${fn.unscheduled_fte
+            ? ` · ${fn.unscheduled_fte} FTE unscheduled` : ""}</small></div>
+        <div class="qgrid">${fn.quarters.map((q) => `
+          <div class="qcell ${q.over ? "over" : ""}">${q.quarter}
+            <b>${q.demand}</b>/${q.capacity}</div>`).join("")}</div>
+        <div style="text-align:right">
+          <input type="number" min="0" style="width:64px" value="${fn.fte_per_quarter}"
+            data-cap="${esc(fn.function)}" title="FTE per quarter" /></div>
+      </div>`).join("")}
+  </div>
+
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table><thead><tr>
+      <th>★</th><th>Ref</th><th>Review</th><th>Team</th><th>Priority</th>
+      <th>Size</th><th>FTE</th><th>Planned quarter</th>
+    </tr></thead><tbody>
+      ${inPlan().filter(matches).map((r) => `<tr>
+        <td>${r.mandated ? '<span class="star">★</span>' : ""}</td>
+        <td><b>${esc(r.ref)}</b></td><td>${esc(r.title)}</td>
+        <td class="small">${esc(r.assurance_function)}</td>
+        <td><span class="band ${r.band}">${r.band}</span> ${r.effective_priority != null ? num(r.effective_priority) : ""}</td>
+        <td><select data-size="${r.ref}">${plan.options.sizes.map((s) =>
+          `<option ${s.value === r.effort_size ? "selected" : ""}>${s.value}</option>`).join("")}</select></td>
+        <td><input type="number" min="1" style="width:60px" value="${r.fte}" data-fte="${r.ref}" /></td>
+        <td><select data-quarter="${r.ref}">
+          <option value="">— unscheduled —</option>
+          ${plan.options.quarters.map((q) =>
+            `<option ${q === r.planned_quarter ? "selected" : ""}>${q}</option>`).join("")}
+        </select>${r.mandated && r.go_live
+          ? ` <span class="muted small">go-live ${esc(r.go_live)}</span>` : ""}</td>
+      </tr>`).join("")}
+    </tbody></table>
+  </div>`;
+}
+
+/* ============================================================ Shaped plan */
+function renderPlan() {
+  return `<div class="panel">
+    <h3>Shaped plan <span class="sub">— the in-plan population by risk taxonomy, priority order.</span></h3>
+    <div class="rowactions">
+      ${filterBar()}
+      <button class="btn primary" onclick="location.href='/api/export/plan'">Export plan to CSV</button>
+      <span class="muted small">${plan.stats.in_plan} reviews ·
+        ${plan.stats.mandated} mandated · ${plan.stats.scheduled} scheduled</span>
+    </div>
+    ${plan.shaped.map((g) => ({ ...g, reviews: g.reviews.filter(matches) }))
+      .filter((g) => g.reviews.length).map((g) => `
+      <div class="plan-dom">
+        <h4>${esc(g.label)} <span class="muted small">— ${g.reviews.length} review(s),
+          ${g.reviews.reduce((s, r) => s + r.fte, 0)} FTE</span></h4>
+        ${g.reviews.map((r) => `<div class="plan-item">
+          <div><b>${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</b> — ${esc(r.title)}
+            <span class="band ${r.band}">${r.band}</span></div>
+          <div class="m">${esc(r.assurance_function)}${r.sub_team ? ` · ${esc(r.sub_team)}` : ""}
+            · ${r.effort_size} · ${r.fte} FTE
+            · ${r.planned_quarter || "unscheduled"}
+            · ${esc(r.business || "business TBC")}${r.locations.length ? ` · ${esc(r.locations.join(", "))}` : ""}
+            · ${r.helios_complete ? "Helios ready" : `${r.helios_missing} field(s) missing`}</div>
+        </div>`).join("")}
+      </div>`).join("") || '<p class="muted">Nothing in the plan yet — stage some reviews.</p>'}
+  </div>`;
+}
+
+/* ============================================================ Approval */
+function approvalScope() {
+  return inPlan().filter((r) => matches(r)
+    && (!filters.route || r.route === filters.route)
+    && (!filters.status || r.approval.status === filters.status));
+}
+
+function renderApproval() {
+  const d = plan.approval;
+  const rows = approvalScope();
+  const sel = (key, label, list) => `<label class="small">${label}
+    <select data-filter="${key}"><option value="">All ${label.toLowerCase()}s</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select></label>`;
+
+  return `<div class="panel">
+    <h3>Approval <span class="sub">— one gate per review: IRR for regulator-mandated, RCA for
+      RCA-linked, 1LOD / L2 for the rest. Returning a review needs a comment.</span></h3>
+    <div class="rowactions">
+      ${filterBar()}
+      ${sel("route", "Route", ["IRR", "RCA", "Standard"])}
+      ${sel("status", "Status", ["Pending", "Approved", "Returned"])}
+      <span class="appr Approved">${d.Approved} approved</span>
+      <span class="appr Pending">${d.Pending} pending</span>
+      <span class="appr Returned">${d.Returned} returned</span>
+      <button class="btn primary" onclick="location.href='/api/export/approvals'">Export view to CSV</button>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table><thead><tr>
+      <th></th><th>Ref</th><th>Review</th><th>Route</th><th>Gate</th><th>Team</th>
+      <th>Business</th><th>Quarter</th><th>FTE</th><th>Priority</th>
+      <th>Obligation</th><th>Related IRR</th><th>Status</th><th>Signed off</th>
+    </tr></thead><tbody>${rows.map(approvalRow).join("")
+      || '<tr><td colspan="14" class="muted">Nothing in the plan matches these filters.</td></tr>'}
+    </tbody></table>
+  </div>`;
+}
+
+function approvalRow(r) {
+  const isOpen = open.appr.has(r.ref);
+  const a = r.approval;
+  const gate = `<tr class="detail"><td colspan="14"><div class="dwrap">
+      <div class="box full gate">
+        <h5>${esc(r.gate)} — ${esc(r.ref)} ${esc(r.title)}</h5>
+        ${a.by ? `<div class="muted small" style="margin-bottom:6px">${esc(a.status)} by
+          ${esc(a.by)} on ${esc((a.at || "").slice(0, 16).replace("T", " "))}${
+          a.note ? ` — ${esc(a.note)}` : ""}</div>` : ""}
+        ${r.related_irr && r.related_irr.length ? `<div class="note" style="margin-bottom:8px">
+          Same obligation as ${r.related_irr.map(esc).join(", ")} — sign these off together
+          so one regulation is not assured twice in ignorance.</div>` : ""}
+        <textarea class="sgnnote" data-sign-note="${r.ref}"
+          placeholder="Comment — required to return, optional to approve"></textarea>
+        <div class="rowactions" style="margin:8px 0 0">
+          <button class="btn sm primary" data-sign="${r.ref}|Approved">Approve</button>
+          <button class="btn sm" data-sign="${r.ref}|Returned">Return</button>
+        </div>
+      </div></div></td></tr>`;
+
+  return `<tr>
+    <td><button class="btn sm ghost" data-appr-open="${r.ref}">${isOpen ? "▴" : "▾"}</button></td>
+    <td class="composite">${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</td>
+    <td>${esc(r.title)}</td>
+    <td><span class="origin ${r.route === "IRR" ? "o-reg" : r.route === "RCA" ? "o-risk" : "o-radar"}"
+      >${esc(r.route)}</span></td>
+    <td class="small">${esc(r.gate)}</td>
+    <td class="small" title="${esc(r.assurance_function)}">${esc(r.function_short)}${
+      r.sub_team ? `<div class="muted" style="font-size:11px">${esc(r.sub_team)}</div>` : ""}</td>
+    <td class="small">${esc(r.business || "—")}</td>
+    <td>${r.planned_quarter || '<span class="muted">—</span>'}</td>
+    <td>${r.fte}</td>
+    <td><span class="band ${r.band}">${r.band}</span>${
+      r.effective_priority != null ? ` ${num(r.effective_priority)}` : ""}</td>
+    <td class="small">${esc(r.regulation || "—")}${
+      r.rris_ids.map((i) => `<span class="rris">${esc(i)}</span>`).join("")}</td>
+    <td class="small">${r.related_irr && r.related_irr.length
+      ? r.related_irr.map(esc).join(", ") : '<span class="muted">—</span>'}</td>
+    <td><span class="appr ${a.status}">${a.status}</span></td>
+    <td class="small">${a.by ? esc(a.by) : '<span class="muted">—</span>'}${
+      a.at ? `<div class="muted" style="font-size:11px">${esc(a.at.slice(0, 10))}</div>` : ""}</td>
+  </tr>${isOpen ? gate : ""}`;
+}
+
+
+/* ============================================================ Pre-staging (Helios) */
+function renderPre() {
+  const rows = inPlan().filter(matches);
+  const ready = rows.filter((r) => r.helios_complete).length;
+  return `<div class="panel">
+    <h3>Helios pre-staging <span class="sub">— capture the Helios attributes for each in-plan
+      review. Only fields in the Planning Key Fields spec are exported.</span></h3>
+    <div class="rowactions">
+      ${filterBar()}
+      <span class="small"><b>${ready} of ${rows.length}</b> Helios-ready</span>
+      <button class="btn primary" id="export-helios" ${ready === rows.length && rows.length
+        ? "" : "disabled"}>Export Helios bulk upload CSV</button>
+      <span class="muted small">The file is refused until every in-plan row is valid.</span>
+    </div>
+    <div class="muted small" style="margin-bottom:10px">
+      Plan / IAP quarter and year are derived from the Target Start Date and cannot be typed.
+    </div>
+    ${rows.map(preRow).join("") || '<p class="muted">Nothing in the plan yet.</p>'}
+  </div>`;
+}
+
+function preRow(r) {
+  const isOpen = open.pre.has(r.ref);
+  const rec = preCache[r.ref];
+  return `<div class="hs-panel">
+    <div class="hs-head" data-pre-open="${r.ref}">
+      <div><b>${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</b> — ${esc(r.title)}</div>
+      <div><span class="cbadge ${r.helios_complete ? "ok" : "no"}">
+        ${r.helios_complete ? "✓ ready" : `${r.helios_missing} to fix`}</span>
+        <span class="muted">${isOpen ? "▴" : "▾"}</span></div>
+    </div>
+    ${isOpen && rec ? `<div class="hs-grid">${spec.fields.map((f) =>
+      preField(r, f, rec)).join("")}</div>` : ""}
+  </div>`;
+}
+
+function preField(r, f, rec) {
+  const value = rec.values[f.key] ?? "";
+  const problem = rec.errors.find((e) => e.field === f.key);
+  const name = `data-pre="${r.ref}|${f.key}"`;
+  let control;
+  if (f.type === "derived") {
+    control = `<div class="derived">${esc(value) || "—"} <span class="muted small">· auto</span></div>`;
+  } else if (f.key === "location") {
+    control = `<div class="derived" style="border-style:solid;background:#f7f9fc">
+      ${esc(value) || "none"} <span class="muted small">· set on the Risk Radar tab</span></div>`;
+  } else if (f.type === "select" && f.allowed) {
+    control = `<select ${name}><option value="">— select —</option>${f.allowed.map((o) =>
+      `<option ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  } else if (f.type === "textarea") {
+    control = `<textarea ${name}>${esc(value)}</textarea>`;
+  } else if (f.type === "date") {
+    control = `<input type="date" ${name} value="${esc(value)}" />`;
+  } else {
+    control = `<input type="text" ${name} value="${esc(value)}" />`;
+  }
+  return `<div class="hs-f g-${f.group} ${f.full_width ? "full" : ""} ${problem ? "bad" : ""}">
+    <label>${esc(f.label)}${f.required ? '<span class="req"> *</span>' : ""}
+      ${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ""}</label>
+    ${control}${problem ? `<div class="msg">${esc(problem.message)}</div>` : ""}</div>`;
+}
+
+/* ============================================================ Versions / audit / reference */
+function renderVersions() {
+  return `<div class="panel">
+    <h3>Versions <span class="sub">— a named snapshot of the shaped plan, so one cut can be
+      compared with another. Restoring does not rewind the audit trail; it records the restore.</span></h3>
+    <div class="rowactions">
+      <input type="text" id="v-label" placeholder="label, e.g. Pre-L2 cut" style="flex:1 1 240px" />
+      <input type="text" id="v-note" placeholder="note (optional)" style="flex:1 1 240px" />
+      <button class="btn primary" id="v-save">Save this version</button>
+    </div>
+    <table><thead><tr><th>Saved</th><th>Label</th><th>By</th><th>In plan</th><th>Mandated</th>
+      <th>Note</th><th></th></tr></thead><tbody>
+      ${plan.versions.map((v) => `<tr>
+        <td class="small">${esc((v.at || "").slice(0, 16).replace("T", " "))}</td>
+        <td><b>${esc(v.label)}</b></td><td class="small">${esc(v.user)}</td>
+        <td>${v.in_plan}</td><td>${v.mandated}</td><td class="small">${esc(v.note)}</td>
+        <td><button class="btn sm" data-restore="${esc(v.id)}">Restore</button></td>
+      </tr>`).join("") || '<tr><td colspan="7" class="muted">No versions saved yet.</td></tr>'}
+    </tbody></table>
+  </div>`;
+}
+
+function renderAudit() {
+  return `<div class="panel">
+    <h3>Audit trail <span class="sub">— append-only. Every staging decision, override, sign-off
+      and pre-staging edit, against the name in the header.</span></h3>
+    <div class="rowactions">
+      <button class="btn primary" onclick="location.href='/api/export/audit'">Export audit trail</button>
+      <span class="muted small">${plan.audit.length} entr${plan.audit.length === 1 ? "y" : "ies"}
+        · newest first · there is deliberately no way to edit or clear it</span>
+    </div>
+    <table><thead><tr><th>When</th><th>Who</th><th>Ref</th><th>Action</th><th>Detail</th></tr></thead>
+      <tbody>${plan.audit.map((a) => `<tr>
+        <td class="small">${esc((a.at || "").slice(0, 16).replace("T", " "))}</td>
+        <td class="small">${esc(a.user)}</td><td class="small"><b>${esc(a.ref)}</b></td>
+        <td class="small">${esc(a.action)}</td><td class="small">${esc(a.detail)}</td>
+      </tr>`).join("") || '<tr><td colspan="5" class="muted">Nothing recorded yet.</td></tr>'}
+      </tbody></table>
+  </div>`;
+}
+
+function renderReference() {
+  const ref = plan.options.reference;
+  return `<div class="panel">
+    <h3>Reference data <span class="sub">— in production these come from the Helios KBD
+      reference-data mapper; this screen is the fallback.</span></h3>
+    <div class="note">A value removed here is not stripped from the reviews that carry it. Those
+      reviews keep it, and pre-staging then reports it as unrecognised — visible and fixable,
+      rather than a silent edit to someone's plan.</div>
+    <div class="refgrid">
+      <div><label class="small">Risk taxonomy — <code>code|label</code> per line</label>
+        <textarea id="ref-taxonomy">${esc(ref.taxonomy.map((t) => `${t.code}|${t.label}`).join("\n"))}</textarea></div>
+      <div><label class="small">Businesses — one per line</label>
+        <textarea id="ref-business">${esc(ref.business.join("\n"))}</textarea></div>
+      <div><label class="small">Locations — one per line</label>
+        <textarea id="ref-location">${esc(ref.location.join("\n"))}</textarea></div>
+    </div>
+    <div class="rowactions" style="margin-top:12px">
+      <button class="btn primary" data-ref-save="taxonomy">Save taxonomy</button>
+      <button class="btn primary" data-ref-save="business">Save businesses</button>
+      <button class="btn primary" data-ref-save="location">Save locations</button>
+    </div>
+  </div>`;
+}
+
+function renderGenAI() {
+  const cards = [
+    ["Risk Radar → Pre-staging", "1 · Draft enrichment", "Drafts the Review Detail and Scope, and suggests Helios fields from a title and a radar theme. A human confirms or edits.", "a", "Phase 2a"],
+    ["Staging", "2 · De-duplication", "Semantically clusters overlapping candidates across 1/2/3LOD and proposes merges with a plain-English reason — the manual step the methodology left off-system.", "a", "Phase 2a"],
+    ["Shaped plan → L2", "3 · Governance narrative", "Auto-drafts the L2 pre-read and the in/out rationale from the plan and the audit trail. Purely assistive.", "a", "Phase 2a"],
+    ["Risk Radar", "4 · Suggested scores with evidence", "Reads supervisory sources and proposes the four driver scores with cited rationale, landing as an accept/override suggestion.", "b", "Phase 2b"],
+    ["Risk Radar / plan", "5 · 2LOD challenge assistant", "“What am I missing?” over the shaped plan — critiques coverage against recent supervisory signals.", "b", "Phase 2b"],
+    ["Staging", "6 · Capacity copilot", "Suggests a quarter phasing that balances load and respects go-live dates, with the trade-offs explained.", "b", "Phase 2b"],
+    ["Whole tool", "7 · Conversational persona", "Natural-language query and edit — “mandated Q1 reviews not yet Helios-ready”. The strategic endgame.", "c", "Phase 2c"],
+  ];
+  const guards = [
+    ["Human-in-the-loop", "AI proposes; a named person disposes. No autonomous decisioning."],
+    ["Explainable & cited", "Every suggestion carries its rationale and source; no unsourced scores."],
+    ["Fully logged", "AI suggestion vs human decision written to the audit trail — the divergence is the evidence."],
+    ["Assistive, not agentic", "Start assistive; defer agentic use until governance matures."],
+    ["Model-risk governed", "Any model here is inventoried and validated like any other."],
+    ["Data residency", "UK / private hosting; no supervisory or firm data leaves the boundary."],
+  ];
+  return `<div class="panel">
+    <h3>Phase 2 — GenAI components <span class="sub">— a forward roadmap. Nothing here calls a
+      model; it is a design for what would be built.</span></h3>
+    <div class="gengrid">${cards.map(([where, title, body, tag, label]) => `
+      <div class="gencard"><div class="where">${esc(where)}</div><h4>${esc(title)}</h4>
+        <p class="small">${esc(body)}</p><span class="gentag ${tag}">${esc(label)}</span></div>`).join("")}
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Governance guardrails <span class="sub">— non-negotiables, because this tool assures AI
+      model risk and must clear the bar it tests.</span></h3>
+    <div class="gengrid">${guards.map(([b, t]) =>
+      `<div class="gencard"><h4>${esc(b)}</h4><p class="small">${esc(t)}</p></div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ============================================================ render + wiring */
+let preCache = {};   // ref -> pre-staging record, fetched lazily when a panel opens
+
+const VIEWS = {
+  radar: renderRadar, staging: renderStaging, plan: renderPlan, approval: renderApproval,
+  pre: renderPre, versions: renderVersions, audit: renderAudit, reference: renderReference,
+  genai: renderGenAI,
+};
+
+function render() {
+  renderDash();
+  renderTabs();
+  $("#view").innerHTML = VIEWS[tab]();
+  wire();
+}
+
+function on(sel, event, fn) {
+  $("#view").querySelectorAll(sel).forEach((el) => { el[event] = () => fn(el); });
+}
+
+function wire() {
+  // filters and sorting
+  on("[data-filter]", "onchange", (el) => {
+    filters[el.dataset.filter] = el.value;
+    if (el.dataset.filter === "team") filters.sub = "";   // sub-teams belong to a team
+    render();
+  });
+  on("[data-sort]", "onclick", (el) => {
+    const k = el.dataset.sort;
+    sort = { key: k, dir: sort.key === k ? -sort.dir : -1 };
+    render();
+  });
+
+  // weights
+  on("[data-weight]", "onchange", (el) =>
+    op("weights", { weights: { [el.dataset.weight]: Number(el.value) } }));
+  const reset = $("#w-reset"); if (reset) reset.onclick = () => op("weights.reset");
+
+  // staging — un-stage takes effect at once and opens the drawer for the reason
+  on("[data-stage]", "onchange", (el) => {
+    const ref = el.dataset.stage;
+    if (el.checked) return op("stage", { ref });
+    open.radar.add(ref);
+    return op("unstage", { ref });
+  });
+  on("[data-toggle]", "onclick", (el) => {
+    const ref = el.dataset.toggle;
+    open.radar.has(ref) ? open.radar.delete(ref) : open.radar.add(ref);
+    render();
+  });
+  on("[data-reason-save]", "onclick", (el) => {
+    const ref = el.dataset.reasonSave;
+    op("reason", { ref, rationale: $("#view").querySelector(`[data-reason="${ref}"]`).value });
+  });
+  on("[data-rmrev]", "onclick", (el) => {
+    if (confirm(`Remove ${el.dataset.rmrev}? Seeded candidates are descoped, not deleted.`)) {
+      op("review.remove", { ref: el.dataset.rmrev });
+    }
+  });
+
+  // inline score editing
+  on("[data-score]", "onchange", (el) => {
+    const [ref, driver] = el.dataset.score.split("|");
+    op("score", { ref, driver, value: Number(el.value) });
+  });
+  on("[data-score-reset]", "onclick", (el) => op("score.reset", { ref: el.dataset.scoreReset }));
+
+  // inline business
+  on("[data-business]", "onchange", (el) =>
+    op("business", { ref: el.dataset.business, value: el.value }));
+  const sh = $("#stage-high"); if (sh) sh.onclick = () => op("stage.critical_and_high");
+  const sc = $("#stage-clear"); if (sc) sc.onclick = () => op("stage.clear");
+
+  // priority: typing in the row stages a pending value, the drawer captures the rationale
+  on("[data-prio]", "onchange", (el) => {
+    const ref = el.dataset.prio;
+    const r = byRef(ref);
+    const value = Number(el.value);
+    if (isNaN(value) || Math.abs(value - (r.computed_priority ?? 0)) < 0.005) {
+      delete pendingPrio[ref];
+      return r.priority_override != null ? op("priority.clear", { ref }) : render();
+    }
+    pendingPrio[ref] = Math.min(5, Math.max(0, value));
+    open.radar.add(ref);
+    render();
+  });
+  on("[data-prio-confirm]", "onclick", async (el) => {
+    const ref = el.dataset.prioConfirm;
+    const why = $("#view").querySelector(`[data-prio-why="${ref}"]`).value;
+    if (!why.trim()) return toast("A rationale is required to override the computed priority.");
+    const value = pendingPrio[ref];
+    delete pendingPrio[ref];
+    await op("priority", { ref, value, rationale: why });
+  });
+  on("[data-prio-cancel]", "onclick", (el) => {
+    delete pendingPrio[el.dataset.prioCancel];
+    render();
+  });
+  on("[data-prio-reset]", "onclick", (el) => op("priority.clear", { ref: el.dataset.prioReset }));
+
+  // notes, steward, locations
+  on("[data-note-add]", "onclick", (el) => {
+    const ref = el.dataset.noteAdd;
+    op("review.comment", { ref, text: $("#view").querySelector(`[data-note="${ref}"]`).value });
+  });
+  on("[data-stew-set]", "onclick", (el) => {
+    const ref = el.dataset.stewSet;
+    op("review.steward", {
+      ref, consulted: true,
+      name: $("#view").querySelector(`[data-stew="${ref}"]`).value,
+    });
+  });
+  on("[data-locadd]", "onchange", (el) => {
+    if (!el.value) return;
+    const r = byRef(el.dataset.locadd);
+    op("review.locations", { ref: r.ref, locations: [...r.locations, el.value] });
+  });
+  on("[data-locrm]", "onclick", (el) => {
+    const [ref, loc] = el.dataset.locrm.split("|");
+    const r = byRef(ref);
+    op("review.locations", { ref, locations: r.locations.filter((l) => l !== loc) });
+  });
+
+  // adding reviews
+  on("[data-add]", "onclick", (el) => {
+    const mandated = el.dataset.add === "1";
+    const p = mandated ? "ar" : "am";
+    const val = (id) => { const e = $(`#${p}-${id}`) || $(`#${id}`); return e ? e.value : ""; };
+    const body = {
+      mandated,
+      title: val("title"),
+      assurance_function: val("fn"),
+      sub_team: val("sub"),
+      taxonomy_code: val("tax"),
+      effort_size: val("size"),
+      rationale: val("why"),
+    };
+    if (mandated) {
+      Object.assign(body, {
+        regulator: $("#ar-reg").value, regulation: $("#ar-obl").value,
+        rris_ids: $("#ar-rris").value, go_live: $("#ar-go").value,
+      });
+    } else {
+      body.scores = Object.fromEntries(plan.options.drivers.map(({ key }) =>
+        [key, Number($(`#am-${key}`).value)]));
+    }
+    op("review.add", body);
+  });
+
+  // staging & capacity
+  const wf = $("#waterfall"); if (wf) wf.onclick = () => op("quarters.waterfall");
+  const qc = $("#qclear"); if (qc) qc.onclick = () => op("quarters.clear");
+  on("[data-quarter]", "onchange", (el) =>
+    op("quarter", { ref: el.dataset.quarter, quarter: el.value || null }));
+  on("[data-size]", "onchange", (el) => op("effort", { ref: el.dataset.size, size: el.value }));
+  on("[data-fte]", "onchange", (el) => op("fte", { ref: el.dataset.fte, fte: Number(el.value) }));
+  on("[data-cap]", "onchange", (el) =>
+    op("capacity", { function: el.dataset.cap, fte_per_quarter: Number(el.value) }));
+
+  // approval
+  on("[data-appr-open]", "onclick", (el) => {
+    const ref = el.dataset.apprOpen;
+    open.appr.has(ref) ? open.appr.delete(ref) : open.appr.add(ref);
+    render();
+  });
+  on("[data-sign]", "onclick", (el) => {
+    const [ref, decision] = el.dataset.sign.split("|");
+    op("signoff", { ref, decision, note: $("#view").querySelector(`[data-sign-note="${ref}"]`).value });
+  });
+
+  // pre-staging
+  on("[data-pre-open]", "onclick", async (el) => {
+    const ref = el.dataset.preOpen;
+    if (open.pre.has(ref)) { open.pre.delete(ref); return render(); }
+    open.pre.add(ref);
+    await loadPre(ref);
+    render();
+  });
+  on("[data-pre]", "onchange", async (el) => {
+    const [ref, key] = el.dataset.pre.split("|");
+    const data = await op("prestaging", { ref, changes: { [key]: el.value } });
+    if (data) { await loadPre(ref); render(); }
+  });
+  const eh = $("#export-helios");
+  if (eh) eh.onclick = async () => {
+    const res = await fetch("/api/export/helios");
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      return toast(`Export refused: ${(d.errors || []).length} row error(s) outstanding.`);
+    }
+    const name = (res.headers.get("Content-Disposition") || "").match(/filename="(.+?)"/);
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url; a.download = name ? name[1] : "helios.csv"; a.click();
+    URL.revokeObjectURL(url);
+    toast("Helios bulk upload exported.", "ok");
+  };
+
+  // versions
+  const vs = $("#v-save");
+  if (vs) vs.onclick = () => op("version.save", { label: $("#v-label").value, note: $("#v-note").value });
+  on("[data-restore]", "onclick", (el) => {
+    if (confirm("Restore this version? The current shaped plan will be replaced.")) {
+      op("version.restore", { id: el.dataset.restore });
+    }
+  });
+
+  // reference data
+  on("[data-ref-save]", "onclick", (el) => {
+    const kind = el.dataset.refSave;
+    const text = $(`#ref-${kind}`).value;
+    const values = kind === "taxonomy"
+      ? text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+          const [code, ...rest] = l.split("|");
+          return { code: code.trim(), label: (rest.join("|") || code).trim() };
+        })
+      : text.split("\n").map((l) => l.trim()).filter(Boolean);
+    op("reference", { kind, values });
+  });
+}
+
+/** The per-field values and errors for one review's Helios row. */
+async function loadPre(ref) {
+  const res = await fetch(`/api/prestaging/${encodeURIComponent(ref)}`);
+  if (res.ok) preCache[ref] = await res.json();
+}
+
+/* ============================================================ start */
+async function start() {
+  $("#user").value = user;
+  $("#user").onchange = (e) => {
+    user = e.target.value.trim();
+    localStorage.setItem("iap_user", user);
+  };
+  spec = await (await fetch("/api/spec")).json();
+  plan = await (await fetch("/api/plan")).json();
+  render();
+}
+
+start();
+</script>
+</body>
+</html>
