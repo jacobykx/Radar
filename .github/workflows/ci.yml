@@ -188,9 +188,11 @@ jobs:
             "http://127.0.0.1:8020/api/op/$1" -H 'Content-Type: application/json' -d "$2"; }
           test "$(op stage.critical_and_high '{"user":"CI"}')" = 200
           test "$(op quarters.waterfall '{"user":"CI"}')" = 200
-          # a priority override with no rationale, and descoping a mandated review, are refused
+          # What the methodology refuses is the missing reason, never the decision itself:
+          # a priority override and a descope both need one on record.
           test "$(op priority '{"user":"CI","ref":"3.2","value":4.9}')" = 422
-          test "$(op descope '{"user":"CI","ref":"4.1","rationale":"no capacity"}')" = 422
+          test "$(op descope '{"user":"CI","ref":"4.1","rationale":"   "}')" = 422
+          test "$(op signoff '{"user":"CI","ref":"4.1","decision":"Returned"}')" = 422
           # the Helios upload is refused while any in-plan row is incomplete
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8020/api/export/helios)" = 422
           for what in plan approvals audit; do
@@ -222,6 +224,28 @@ jobs:
           assert len([r for r in plan.reviews if r.in_plan]) == 10
           assert plan.review("4.1").planned_quarter.value == "Q1"
           assert len(plan.audit) == 2
+          PY
+
+      - name: Un-staging takes effect at once and the reason is chased
+        # The prototype's flow: the click lands, the rationale follows, and the review is
+        # flagged until it does. Runs last because it deliberately changes the plan.
+        run: |
+          op() { curl -s -o /dev/null -w '%{http_code}' -X POST \
+            "http://127.0.0.1:8020/api/op/$1" -H 'Content-Type: application/json' -d "$2"; }
+          test "$(op unstage '{"user":"CI","ref":"4.1"}')" = 200
+          python - <<'PY'
+          from helios.planning.store import Store
+          review = Store("ci-plan.json").load().review("4.1")
+          assert not review.staged, "un-stage did not take effect"
+          assert review.rationale_outstanding, "a reason-less removal must be flagged"
+          assert not review.descoped, "no reason yet, so not descoped"
+          assert review.planned_quarter is None, "it should release its capacity"
+          PY
+          test "$(op reason '{"user":"CI","ref":"4.1","rationale":"Deferred to 2028."}')" = 200
+          python - <<'PY'
+          from helios.planning.store import Store
+          review = Store("ci-plan.json").load().review("4.1")
+          assert review.descoped and not review.rationale_outstanding, "the flag should clear"
           PY
 
   frontend:
