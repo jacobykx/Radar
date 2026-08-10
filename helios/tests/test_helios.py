@@ -5,12 +5,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
+import tempfile
 import unittest
 from datetime import date
+from pathlib import Path
 
-from helios import export, mapping, reference, spec, validation
+from helios import __main__, export, mapping, reference, spec, validation
 
 VALID = {
     "reviewId": "AREV-31",
@@ -249,6 +252,66 @@ class CsvGeneration(unittest.TestCase):
 
     def test_the_filename_follows_the_plan_year(self):
         self.assertEqual(export.build([VALID]).filename, "2027_IAP_Helios_upload.csv")
+
+
+class FilesAcrossPlatforms(unittest.TestCase):
+    """The CSV has to survive the round trip on Windows as well as here."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = Path(self.dir.name)
+        self.source = (
+            "ref,title,team,sub-team,category,lead,business,go-live,rationale\n"
+            "5.1,Basel 3.1,Treasury Risk Assurance,Global,Global,45012345,"
+            "Global Functions — Finance,1 Jan 2027,Capital model readiness.\n"
+        )
+
+        self.quiet = contextlib.redirect_stderr(io.StringIO())  # progress and error notes
+        self.quiet.__enter__()
+        self.addCleanup(self.quiet.__exit__, None, None, None)
+
+    def _write(self, name: str, encoding: str) -> Path:
+        path = self.path / name
+        path.write_bytes(self.source.encode(encoding))
+        return path
+
+    def test_excel_on_windows_saves_cp1252_and_it_still_reads(self):
+        # "CSV (Comma delimited)" — Excel's default, and not UTF-8.
+        rows, _ = mapping.from_csv(__main__.read_text(self._write("ansi.csv", "cp1252")))
+        self.assertEqual(rows[0]["business"], "Global Functions — Finance")
+
+    def test_excel_csv_utf8_carries_a_bom_and_it_still_reads(self):
+        rows, _ = mapping.from_csv(__main__.read_text(self._write("bom.csv", "utf-8-sig")))
+        self.assertEqual(rows[0]["reviewId"], "AREV-51")
+        self.assertEqual(rows[0]["business"], "Global Functions — Finance")
+
+    def test_plain_utf8_reads(self):
+        rows, _ = mapping.from_csv(__main__.read_text(self._write("plain.csv", "utf-8")))
+        self.assertEqual(rows[0]["business"], "Global Functions — Finance")
+
+    def test_a_written_file_is_utf8_with_crlf_and_no_stray_carriage_returns(self):
+        out = self.path / "out.csv"
+        __main__.convert(self._write("in.csv", "utf-8"), out)
+        raw = out.read_bytes()
+        raw.decode("utf-8")  # raises if the platform encoding leaked in
+        self.assertNotIn(b"\r\r\n", raw)
+        self.assertEqual(raw.count(b"\r\n"), raw.count(b"\n"))
+
+    def test_the_csv_is_utf8_on_stdout_whatever_the_console_encoding_is(self):
+        # Stands in for a redirected stdout on Windows, where the console code page
+        # would otherwise decide the file's encoding.
+        buffer = io.BytesIO()
+        stdout = io.TextIOWrapper(buffer, encoding="cp1252")
+        with contextlib.redirect_stdout(stdout):
+            __main__.convert(self._write("in.csv", "utf-8"), None)
+        self.assertIn("Global Functions — Finance", buffer.getvalue().decode("utf-8"))
+
+    def test_a_binary_file_is_refused_rather_than_mangled(self):
+        path = self.path / "not.csv"
+        path.write_bytes(b"\x81\x8d\x8f\x90\x9d\x00\xff")
+        with self.assertRaises(SystemExit):
+            __main__.read_text(path)
 
 
 if __name__ == "__main__":

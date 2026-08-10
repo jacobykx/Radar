@@ -23,6 +23,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
 
+    # Messages carry em dashes and ellipses. An older Windows console code page cannot
+    # encode those, and a crash while reporting an error is the worst time to have one.
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(errors="replace")
+
     if args.source is None:
         server.serve(args.host, args.port)
         return 0
@@ -36,7 +41,7 @@ def convert(source: Path, out: Path | None) -> int:
         print(f"{source}: no such file", file=sys.stderr)
         return 2
 
-    rows, ignored = mapping.from_csv(source.read_text(encoding="utf-8"))
+    rows, ignored = mapping.from_csv(read_text(source))
     if ignored:
         print(f"ignored {len(ignored)} unrecognised column(s): {', '.join(ignored)}",
               file=sys.stderr)
@@ -49,11 +54,37 @@ def convert(source: Path, out: Path | None) -> int:
         return 1
 
     if out:
-        out.write_text(result.csv, encoding="utf-8", newline="")
+        # newline="" keeps the CRLF the writer already put in; without it Windows would
+        # translate again and every line would end \r\r\n.
+        with out.open("w", encoding="utf-8", newline="") as handle:
+            handle.write(result.csv)
         print(f"{result.rows} row(s) -> {out}", file=sys.stderr)
     else:
-        sys.stdout.write(result.csv)
+        # Bytes, not sys.stdout.write: a redirected stdout on Windows encodes with the
+        # console code page, which would silently emit a cp1252 file whose em dashes
+        # Helios cannot read. The CSV is UTF-8 wherever it is written.
+        sys.stdout.buffer.write(result.csv.encode("utf-8"))
+        sys.stdout.buffer.flush()
     return 0
+
+
+#: Tried in order. utf-8-sig first because it also covers plain UTF-8 and strips any BOM;
+#: cp1252 second because it is what Excel's default "CSV (Comma delimited)" writes on
+#: Windows, and decoding it as UTF-8 fails on the first em dash or smart quote.
+_ENCODINGS = ("utf-8-sig", "cp1252")
+
+
+def read_text(source: Path) -> str:
+    """Read a CSV whatever the machine that saved it used."""
+    raw = source.read_bytes()
+    for encoding in _ENCODINGS:
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    # cp1252 leaves only five bytes undefined, so getting here means the file is binary.
+    print(f"{source}: not readable as text — is it really a CSV?", file=sys.stderr)
+    raise SystemExit(2)
 
 
 if __name__ == "__main__":

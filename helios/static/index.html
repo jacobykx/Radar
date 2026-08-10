@@ -352,7 +352,14 @@ async function start() {
   $("#cancel-import").onclick = () => $("#importer").close();
   $("#file").onchange = async (ev) => {
     const file = ev.target.files[0];
-    if (file) $("#paste").value = await file.text();
+    if (!file) return;
+    const text = await file.text();  // always decoded as UTF-8 by the browser
+    $("#paste").value = text;
+    // Excel's default "CSV (Comma delimited)" is cp1252, which lands here as U+FFFD.
+    // Say so, or the only symptom is every business name failing to match.
+    $("#import-msg").textContent = text.includes("�")
+      ? "This file is not UTF-8 — re-save it from Excel as “CSV UTF-8”, or some characters will be wrong."
+      : "";
   };
   $("#do-import").onclick = () => {
     const text = $("#paste").value.trim();

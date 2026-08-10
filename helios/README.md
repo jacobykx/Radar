@@ -4,15 +4,29 @@ A lite app whose only job is to produce a **valid Helios bulk upload CSV**. It i
 narrowed rebuild of the pre-staging tab from the MVP prototype
 (`2027_IAP_Planning_Module.html`), with the planning workflow around it left out.
 
-Standard library only — no pip install, no Poetry, no Node, no database.
+Standard library only — no pip install, no Poetry, no Node, no database. **Python 3.9 or
+newer**, unlike `backend/`, which needs 3.12.
 
-```
+```bash
 python3 -m helios                          # http://127.0.0.1:8000
 python3 -m helios reviews.csv -o out.csv   # convert without opening a browser
 python3 -m unittest discover -s helios/tests -t .
 ```
 
 Or `make helios` / `make test-helios` from the repository root.
+
+On **Windows**, use the launcher and run from the repository root — there is nothing to
+install and `make` is not needed:
+
+```powershell
+py -m helios
+py -m helios reviews.csv -o out.csv
+py -m unittest discover -s helios\tests -t .
+```
+
+CI runs the full suite on `windows-latest` as well as Linux, and on 3.9 as well as 3.12,
+so "works on Windows" is a test result rather than an intention. See
+[Windows specifics](#windows-specifics) for what that covers.
 
 ## What it does
 
@@ -97,6 +111,35 @@ the written spec — if that turns out to be wrong, remove them from `spec.REQUI
 
 The UI keeps rows in `localStorage` and holds no validation logic of its own — every check
 is the server's, so what you see on screen is what the export will enforce.
+
+## Windows specifics
+
+Three things go wrong on Windows and nowhere else. All three are fixed and covered by
+tests that run on the Windows CI runner.
+
+**Excel does not save UTF-8 by default.** "CSV (Comma delimited)" — the top entry in the
+Save As dialog — writes cp1252. Reading that as UTF-8 aborts on the first em dash, and the
+business names are full of them. Input is decoded as UTF-8 (BOM tolerated) and falls back
+to cp1252, so a file straight out of Excel converts with no ceremony. Excel's other option,
+"CSV UTF-8", writes a BOM; that is stripped.
+
+**A redirected stdout takes the console code page.** `py -m helios plan.csv > out.csv` used
+to produce a cp1252 file that Helios reads as mojibake, silently. The CSV is now written to
+stdout as UTF-8 bytes, so it is the same file however it is redirected. `-o` was always
+correct; the pipe was not.
+
+**Line endings get translated twice.** The writer already emits CRLF, and Windows text mode
+would turn each one into `\r\r\n`. The output file is opened with `newline=""` to stop that.
+
+One case is only mitigated, not fixed: the browser's **file picker** always decodes as
+UTF-8, so a cp1252 file loaded there arrives with replacement characters and the app cannot
+tell what it should have been. It detects them and says to re-save as "CSV UTF-8" rather
+than leaving you to work out why every business name is suddenly unrecognised. Pasting the
+text in, or using the CLI, avoids it entirely.
+
+Error messages contain em dashes and ellipses. On an older console code page that cannot
+encode them they degrade to `?` rather than raising — a crash while reporting an error is
+the worst time to have one.
 
 ## Reference data
 
