@@ -4,11 +4,21 @@ A 2LOD assurance planning tool: turns risk-scoring output and externally-mandate
 obligations into a shaped, capacity-feasible, signed-off annual assurance plan, exported
 to Helios. Target platform is **FRAME**.
 
+**FRAME is the deployment target, not a requirement to run it.** Locally the application
+is self-contained: Python and Node, and nothing else. No FRAME, no Postgres, no Docker,
+no identity provider, no network access at runtime. See
+[Running without FRAME](#running-without-frame) for how identity works when the platform
+is not in front of the API.
+
 See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 
 ---
 
 ## Running it locally
+
+You need **Python 3.11** and **Node 22**. That is the whole list — the database is a
+SQLite file and authentication is stubbed, so there is nothing else to install, stand up
+or connect to.
 
 ```bash
 make setup     # Poetry + npm install, and writes backend/.env
@@ -130,19 +140,46 @@ so run it before assuming a frontend break is a frontend bug.
 | **Versions** | Save a baseline, change the plan, restore it. The audit trail is not rolled back — restoring is itself an audited event. |
 | **Audit trail** | Append-only. There is no edit or delete endpoint, and `DELETE /audit` returns 405. |
 
-### Local identity
+---
 
-There is no FRAME in front of the API locally, so `IAP_AUTH_DEV_MODE=true` in `.env`
-supplies a synthetic user holding all three roles. To exercise RBAC, send the headers
-FRAME would:
+## Running without FRAME
+
+In a deployed environment FRAME validates the AM Token and forwards the caller's identity
+to the API as two headers, `x-frame-user` and `x-frame-ad-groups`. Locally there is no
+FRAME to do that, so `IAP_AUTH_DEV_MODE=true` in `backend/.env` substitutes a synthetic
+user holding all three roles. `make setup` writes that file for you, which is why the
+application runs standalone with no further configuration.
+
+RBAC is still real — dev mode supplies an identity, it does not bypass the checks. Send
+the headers FRAME would and the roles apply exactly as they would in a deployment:
 
 ```bash
-curl -H "x-frame-user: someone" -H "x-frame-ad-groups: IAP_READER" http://127.0.0.1:8010/permission
+curl -H "x-frame-user: someone" -H "x-frame-ad-groups: IAP_READER" \
+  http://127.0.0.1:8010/permission
 ```
 
-A reader gets 403 on any write. **`IAP_AUTH_DEV_MODE` must stay false in every deployed
-environment** — with it on, any unauthenticated caller is granted every role. It
-defaults to false and the server logs a warning on every start when it is on.
+A reader gets 403 on any write; a planner gets 201. The AD-group-to-role map is
+`app/auth/frame.py`.
+
+### Local development versus deploying without FRAME
+
+These are different problems and only the first is solved by a setting.
+
+**On your own machine**, dev mode is exactly right. It is what it exists for.
+
+**Anything shared** — a team server, a demo box, anything reachable by another person —
+must not use it. `IAP_AUTH_DEV_MODE=true` grants every caller planner, approver *and*
+admin, with no authentication at all. It is not a weak default that could be tightened;
+there is no credential in the exchange. It defaults to **false** so a deployment that
+forgets to configure it fails closed with a 401 rather than silently admitting anonymous
+administrators, and the server logs a warning on every start when it is on.
+
+**To deploy without FRAME at all**, authentication has to be implemented. The seam is
+clean: `app/auth/frame.py` is around 90 lines, and everything downstream depends only on
+`get_current_user()` returning a `CurrentUser`. Putting OIDC or SAML against your own IdP
+there, or a reverse proxy that authenticates and sets the same two headers, is a change to
+that one file — no router, service or model touches auth. The AD group names would become
+whatever your groups or claims are called.
 
 ---
 
@@ -162,8 +199,13 @@ Three of them are not optional:
 | Setting | In a deployed environment |
 |---|---|
 | `IAP_DATABASE_URL` | Postgres. The SQLite fallback has no JSONB, no concurrent writers and no transactional DDL |
-| `IAP_AUTH_DEV_MODE` | **false.** With it on, any unauthenticated caller is granted planner, approver *and* admin |
+| `IAP_AUTH_DEV_MODE` | **false.** With it on, any unauthenticated caller is granted planner, approver *and* admin. Deploying somewhere without FRAME means implementing auth, not enabling this — see [Running without FRAME](#running-without-frame) |
 | `IAP_CORS_ORIGINS` | The deployed frontend origin. Never `*` — the API trusts role-bearing headers |
+
+The API trusts `x-frame-user` and `x-frame-ad-groups` completely, so it must be
+unreachable except through FRAME, and FRAME must **strip client-supplied `x-frame-*`
+headers at the edge** rather than pass them through. Confirm that with the platform team:
+it is the difference between correct and wide open.
 
 ### Schema
 
