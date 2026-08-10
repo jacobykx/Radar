@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.dialects import postgresql
@@ -14,7 +14,7 @@ JSONType = JSON().with_variant(postgresql.JSONB(), "postgresql")
 
 
 def utcnow() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 class Base(DeclarativeBase):

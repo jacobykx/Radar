@@ -30,7 +30,9 @@ def seed(session: Session, *, force: bool = False) -> Plan:
     if existing is not None and not force:
         return existing
 
-    plan = existing or Plan(year=settings.plan_year, name=f"{settings.plan_year} Indicative Annual Plan")
+    plan = existing or Plan(
+        year=settings.plan_year, name=f"{settings.plan_year} Indicative Annual Plan"
+    )
     session.add(plan)
     session.flush()
 

@@ -185,8 +185,9 @@ def set_locations(
 ) -> Review:
     """Rule 13: replace the multi-location set, ordered by the reference list."""
     previous = [loc.location for loc in sorted(review.locations, key=lambda x: x.sort_order)]
-    unique = list(dict.fromkeys(l.strip() for l in locations if l and l.strip()))
-    ordered = [l for l in reference if l in unique] + [l for l in unique if l not in reference]
+    unique = list(dict.fromkeys(loc.strip() for loc in locations if loc and loc.strip()))
+    ordered = [loc for loc in reference if loc in unique]
+    ordered += [loc for loc in unique if loc not in reference]
 
     review.locations.clear()
     session.flush()

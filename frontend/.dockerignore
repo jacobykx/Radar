@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+.env
+.env.*
+!.env.example
+
+# Specs run in CI, not inside the image build.
+**/*.test.ts
+**/*.test.tsx
+jest.config.mjs
+jest.setup.ts
+jest.environment.cjs

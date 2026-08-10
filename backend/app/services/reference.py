@@ -14,7 +14,9 @@ from app.models import ReferenceData, Review, ReviewLocation
 from app.services import audit
 
 
-def values(session: Session, kind: ReferenceKind, *, active_only: bool = True) -> list[ReferenceData]:
+def values(
+    session: Session, kind: ReferenceKind, *, active_only: bool = True
+) -> list[ReferenceData]:
     query = session.query(ReferenceData).filter(ReferenceData.kind == kind.value)
     if active_only:
         query = query.filter(ReferenceData.active.is_(True))
@@ -66,7 +68,11 @@ def impact(session: Session, plan_id: int) -> dict:
 
     return {
         "taxonomy": sorted(
-            {r.taxonomy_code for r in reviews if r.taxonomy_code and r.taxonomy_code not in taxonomy}
+            {
+                r.taxonomy_code
+                for r in reviews
+                if r.taxonomy_code and r.taxonomy_code not in taxonomy
+            }
         ),
         "business": sorted(
             {r.business for r in reviews if r.business and r.business not in businesses}

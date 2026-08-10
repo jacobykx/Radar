@@ -28,12 +28,16 @@ def _capture(session: Session, plan_id: int) -> dict:
                 "effort_size": r.effort_size,
                 "fte_override": r.fte_override,
                 "business": r.business,
-                "locations": [loc.location for loc in sorted(r.locations, key=lambda x: x.sort_order)],
+                "locations": [
+                    loc.location for loc in sorted(r.locations, key=lambda x: x.sort_order)
+                ],
                 "item": {
                     "staged": bool(r.item and r.item.staged),
                     "planned_quarter": r.item.planned_quarter if r.item else None,
                     "priority_override": r.item.priority_override if r.item else None,
-                    "priority_override_rationale": r.item.priority_override_rationale if r.item else None,
+                    "priority_override_rationale": (
+                        r.item.priority_override_rationale if r.item else None
+                    ),
                     "descope_rationale": r.item.descope_rationale if r.item else None,
                 },
                 "prestaging": {

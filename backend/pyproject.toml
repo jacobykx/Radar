@@ -6,7 +6,7 @@ authors = ["Assurance Technology"]
 packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 fastapi = "^0.115.0"
 uvicorn = { extras = ["standard"], version = "^0.32.0" }
 sqlalchemy = "^2.0.36"
@@ -32,7 +32,20 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# `Depends(...)` / `Query(...)` in a parameter default is the FastAPI dependency-injection
+# idiom, not the mutable-default bug B008 exists to catch. Declaring them immutable keeps
+# B008 switched on for genuine cases rather than silencing the rule wholesale.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "app.auth.frame.require",
+]

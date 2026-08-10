@@ -91,7 +91,7 @@ class ReviewView:
         """Staged and not descoped: the population every downstream stage works on."""
         return self.staged and not self.descoped
 
-    def with_quarter(self, quarter: Quarter | None) -> "ReviewView":
+    def with_quarter(self, quarter: Quarter | None) -> ReviewView:
         return replace(self, planned_quarter=quarter)
 
 

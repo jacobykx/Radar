@@ -63,24 +63,36 @@ REFERENCE_BACKED: dict[str, str] = {"business": "business", "location": "locatio
 HELIOS_FIELDS: tuple[HeliosField, ...] = (
     HeliosField("reviewId", "Lookup Key (Review ID)", "text"),
     HeliosField("title", "Title", "text", full_width=True),
-    HeliosField("reviewDetail", "Review Detail (Review Rationale)", "textarea", FieldGroup.CHANGE, full_width=True),
+    HeliosField(
+        "reviewDetail", "Review Detail (Review Rationale)", "textarea", FieldGroup.CHANGE,
+        full_width=True,
+    ),
     HeliosField("reviewType", "Review Type", "select", allowed=(
         "Core - Externally mandated", "Core - Internally mandated", "Additional", "Opinion Paper")),
     HeliosField("reviewCategory", "Review Category", "select", allowed=(
         "Global", "Regional", "Country", "Single - Market Review", "Multi - Market Review")),
-    HeliosField("assuranceFunction", "Assurance Function", "select", FieldGroup.CHANGE, allowed=ASSURANCE_FUNCTIONS),
+    HeliosField(
+        "assuranceFunction", "Assurance Function", "select", FieldGroup.CHANGE,
+        allowed=ASSURANCE_FUNCTIONS,
+    ),
     HeliosField("reviewLead", "Review Lead (Staff ID)", "text"),
     HeliosField("reviewTeam", "Review Team", "select", allowed=REVIEW_TEAMS),
     HeliosField("business", "Business", "select", hint="KBD Reference Data Mapper"),
-    HeliosField("location", "Location(s)", "multiloc", hint="KBD Reference Data Mapper - multi-select"),
+    HeliosField(
+        "location", "Location(s)", "multiloc", hint="KBD Reference Data Mapper - multi-select",
+    ),
     HeliosField("legalEntity", "Legal Entity", "text", hint="KBD Reference Data Mapper"),
     HeliosField("riskTaxonomy", "Risk Taxonomy", "text", hint="Group Risk Taxonomy"),
-    HeliosField("riskFlags", "Risk Flags", "select", allowed=("FRB/DPA", "Swap Dealer", "Volcker", "NA")),
+    HeliosField(
+        "riskFlags", "Risk Flags", "select", allowed=("FRB/DPA", "Swap Dealer", "Volcker", "NA"),
+    ),
     HeliosField("esgFlag", "ESG Flag", "select", allowed=("Yes", "No")),
     HeliosField("conductOutcome", "Conduct Outcome", "text", hint="See Assurance Reference Data"),
     HeliosField("scopeRationale", "Review Scope and Rationale", "textarea", full_width=True),
     HeliosField("gscCoverage", "GSC Coverage", "text"),
-    HeliosField("status", "Assurance Review Status", "select", FieldGroup.CHANGE, allowed=("Planned",)),
+    HeliosField(
+        "status", "Assurance Review Status", "select", FieldGroup.CHANGE, allowed=("Planned",),
+    ),
     HeliosField("targetStart", "Target Start Date", "date"),
     HeliosField("planQuarter", "Plan Quarter", "derived", FieldGroup.SYSTEM),
     HeliosField("iapQuarter", "IAP Quarter", "derived", FieldGroup.SYSTEM),
