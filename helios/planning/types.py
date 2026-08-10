@@ -133,6 +133,8 @@ class Review:
     mandated: bool = False
     effort_size: EffortSize = EffortSize.M
     scores: Scores | None = None
+    #: What the scoring engine supplied, kept only once a score is edited by hand.
+    seeded_scores: Scores | None = None
     sub_team: str = ""
     taxonomy_code: str = ""
     business: str = ""
@@ -177,8 +179,12 @@ class Review:
 
     @property
     def rationale_outstanding(self) -> bool:
-        """Out of the plan with nothing on record explaining why."""
-        return not self.staged and not self.mandated and not self.descoped
+        """Out of the plan with nothing on record explaining why.
+
+        Includes mandated reviews: the prototype lets one be taken out, so an obligation
+        dropped without a reason is exactly the thing that must be chased, not prevented.
+        """
+        return not self.staged and not self.descoped
 
     @property
     def in_plan(self) -> bool:
@@ -199,6 +205,7 @@ class Review:
             "mandated": self.mandated,
             "effort_size": self.effort_size.value,
             "scores": self.scores.to_dict() if self.scores else None,
+            "seeded_scores": self.seeded_scores.to_dict() if self.seeded_scores else None,
             "sub_team": self.sub_team,
             "taxonomy_code": self.taxonomy_code,
             "business": self.business,
@@ -232,6 +239,7 @@ class Review:
             mandated=bool(data.get("mandated")),
             effort_size=_enum(EffortSize, data.get("effort_size"), EffortSize.M),
             scores=Scores.from_dict(data.get("scores")),
+            seeded_scores=Scores.from_dict(data.get("seeded_scores")),
             sub_team=data.get("sub_team") or "",
             taxonomy_code=data.get("taxonomy_code") or "",
             business=data.get("business") or "",

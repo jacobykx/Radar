@@ -43,6 +43,8 @@ OPS = {
     "weights.reset": lambda p, b, u: actions.reset_weights(p, user=u),
 
     "stage": lambda p, b, u: actions.stage(p, b["ref"], user=u),
+    "unstage": lambda p, b, u: actions.unstage(p, b["ref"], user=u),
+    "reason": lambda p, b, u: actions.set_reason(p, b["ref"], b.get("rationale", ""), user=u),
     "descope": lambda p, b, u: actions.descope(p, b["ref"], b.get("rationale", ""), user=u),
     "stage.critical_and_high": lambda p, b, u: actions.stage_critical_and_high(p, user=u),
     "stage.clear": lambda p, b, u: actions.clear_staging(p, user=u),
@@ -50,6 +52,9 @@ OPS = {
     "priority": lambda p, b, u: actions.override_priority(
         p, b["ref"], b.get("value", 0), b.get("rationale", ""), user=u),
     "priority.clear": lambda p, b, u: actions.clear_override(p, b["ref"], user=u),
+    "score": lambda p, b, u: actions.set_score(p, b["ref"], b["driver"], b.get("value", 3), user=u),
+    "score.reset": lambda p, b, u: actions.reset_scores(p, b["ref"], user=u),
+    "business": lambda p, b, u: actions.set_business(p, b["ref"], b.get("value", ""), user=u),
 
     "effort": lambda p, b, u: actions.set_effort(p, b["ref"], b["size"], user=u),
     "fte": lambda p, b, u: actions.set_fte(p, b["ref"], b.get("fte"), user=u),

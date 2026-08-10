@@ -40,6 +40,11 @@ def review(plan: Plan, item, *, related: bool = False) -> dict:
         "fte": item.fte,
         "fte_override": item.fte_override,
         "scores": item.scores.to_dict() if item.scores else None,
+        "seeded_scores": item.seeded_scores.to_dict() if item.seeded_scores else None,
+        "scores_edited": sorted(
+            k for k in ("risk", "urgency", "coverage_gap", "change")
+            if item.seeded_scores and getattr(item.scores, k) != getattr(item.seeded_scores, k)
+        ) if item.seeded_scores and item.scores else [],
         "computed_priority": round(computed, 2) if computed is not None else None,
         "effective_priority": round(effective, 2) if effective is not None else None,
         "priority_override": item.priority_override,
@@ -59,6 +64,9 @@ def review(plan: Plan, item, *, related: bool = False) -> dict:
         "steward_consulted": item.steward_consulted,
         "steward_name": item.steward_name,
         "comments": [c.to_dict() for c in item.comments],
+        "comment_count": len(item.comments),
+        "taxonomy_short": taxonomy_short(plan, item.taxonomy_code),
+        "function_short": function_short(item.assurance_function),
         "route": approval.route_of(item).value,
         "gate": approval.gate_of(item),
         "approval": item.approval.to_dict(),
@@ -68,6 +76,24 @@ def review(plan: Plan, item, *, related: bool = False) -> dict:
     if related:
         out["related_irr"] = [r.ref for r in approval.related_irr(item, plan.reviews)]
     return out
+
+
+#: Column-width abbreviations, as the prototype's dense table uses. The full value stays
+#: on the element's title so nothing is actually lost.
+_TAXONOMY_SHORT = {
+    "change-ai": "Change/AI", "op-res": "Op Res & TP", "prudential": "Prudential",
+    "fincrime": "Fin Crime", "conduct": "Conduct",
+}
+
+
+def taxonomy_short(plan: Plan, code: str) -> str:
+    return _TAXONOMY_SHORT.get(code) or taxonomy_label(plan, code)
+
+
+def function_short(name: str) -> str:
+    return (name.removesuffix(" Assurance")
+            .replace("Regulatory ", "Reg ")
+            .replace("Wholesale Credit Risk Unit", "Wholesale Credit"))
 
 
 def taxonomy_label(plan: Plan, code: str) -> str:

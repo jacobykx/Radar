@@ -107,11 +107,36 @@ class Staging(unittest.TestCase):
             actions.descope(p, "3.2", "", user="Jacob")
         self.assertTrue(p.review("3.2").in_plan)
 
-    def test_a_mandated_review_cannot_be_descoped_at_all(self):
+    def test_a_mandated_review_can_be_taken_out_but_only_on_the_record(self):
+        """The prototype allows it, and hiding the option would hide the decision."""
         p = plan()
         with self.assertRaises(RationaleRequired):
-            actions.descope(p, "4.1", "no capacity this year", user="Jacob")
+            actions.descope(p, "4.1", "", user="Jacob")
         self.assertTrue(p.review("4.1").in_plan)
+
+        actions.descope(p, "4.1", "Deferred to 2028, regulator informed.", user="Jacob")
+        self.assertFalse(p.review("4.1").in_plan)
+        self.assertTrue(p.review("4.1").descoped)
+
+    def test_unstaging_takes_effect_at_once_and_the_reason_is_chased(self):
+        """The prototype's flow: the click lands, the rationale follows."""
+        p = plan()
+        actions.unstage(p, "4.1", user="Jacob")
+        review = p.review("4.1")
+        self.assertFalse(review.staged)
+        self.assertTrue(review.rationale_outstanding)   # flagged until explained
+        self.assertFalse(review.descoped)
+        self.assertIsNone(review.planned_quarter)       # it releases its capacity
+
+        actions.set_reason(p, "4.1", "Deferred to 2028, regulator informed.", user="Jacob")
+        self.assertFalse(p.review("4.1").rationale_outstanding)
+        self.assertTrue(p.review("4.1").descoped)
+
+    def test_an_outstanding_rationale_is_counted_for_the_planner(self):
+        p = plan()
+        before = views.stats(p)["outstanding_rationales"]
+        actions.unstage(p, "4.1", user="Jacob")
+        self.assertEqual(views.stats(p)["outstanding_rationales"], before + 1)
 
     def test_a_descoped_review_is_kept_not_deleted(self):
         p = plan()
@@ -149,6 +174,73 @@ class Staging(unittest.TestCase):
         actions.stage_critical_and_high(p, user="Jacob")
         actions.clear_staging(p, user="Jacob")
         self.assertEqual({r.ref for r in staging.in_plan(p.reviews)}, {"4.1", "5.1", "7.2"})
+
+
+class InlineScoreEditing(unittest.TestCase):
+    """The prototype edits the four driver scores in the row; the engine's values survive."""
+
+    def test_an_edit_keeps_what_the_scoring_engine_said(self):
+        p = plan()
+        actions.set_score(p, "3.1", "risk", 5, user="Jacob")
+        review = p.review("3.1")
+        self.assertEqual(review.scores.risk, 5)
+        self.assertEqual(review.seeded_scores.risk, 4)
+        self.assertEqual(views.review(p, review)["scores_edited"], ["risk"])
+
+    def test_an_edit_moves_the_priority_it_feeds(self):
+        p = plan()
+        before = views.review(p, p.review("3.1"))["computed_priority"]
+        actions.set_score(p, "3.1", "risk", 5, user="Jacob")
+        self.assertGreater(views.review(p, p.review("3.1"))["computed_priority"], before)
+
+    def test_scores_are_clamped_to_the_scale(self):
+        p = plan()
+        actions.set_score(p, "3.1", "risk", 99, user="Jacob")
+        self.assertEqual(p.review("3.1").scores.risk, 5.0)
+        actions.set_score(p, "3.1", "urgency", -3, user="Jacob")
+        self.assertEqual(p.review("3.1").scores.urgency, 1.0)
+
+    def test_resetting_restores_the_engine_values_and_clears_the_marker(self):
+        p = plan()
+        actions.set_score(p, "3.1", "risk", 5, user="Jacob")
+        actions.reset_scores(p, "3.1", user="Jacob")
+        self.assertEqual(p.review("3.1").scores.risk, 4)
+        self.assertEqual(views.review(p, p.review("3.1"))["scores_edited"], [])
+
+    def test_a_mandated_review_has_no_scores_to_edit(self):
+        p = plan()
+        p.review("4.1").scores = None
+        with self.assertRaises(PlanningError):
+            actions.set_score(p, "4.1", "risk", 5, user="Jacob")
+
+    def test_an_unknown_driver_is_refused(self):
+        p = plan()
+        with self.assertRaises(PlanningError):
+            actions.set_score(p, "3.1", "vibes", 5, user="Jacob")
+
+    def test_every_edit_lands_on_the_audit_trail(self):
+        p = plan()
+        actions.set_score(p, "3.1", "risk", 5, user="Jacob")
+        self.assertEqual(p.audit[0].action, "Score edited")
+        self.assertIn("Risk score 4 → 5", p.audit[0].detail)
+
+
+class InlineBusiness(unittest.TestCase):
+    def test_setting_business_flows_through_to_the_helios_column(self):
+        p = plan()
+        actions.set_business(p, "3.1", "IWPB — Wealth", user="Jacob")
+        self.assertEqual(p.review("3.1").business, "IWPB — Wealth")
+        self.assertEqual(prestaging.read(p.review("3.1"))["values"]["business"], "IWPB — Wealth")
+
+    def test_it_normalises_what_the_planner_picked(self):
+        p = plan()
+        actions.set_business(p, "3.1", "iwpb - wealth", user="Jacob")
+        self.assertEqual(p.review("3.1").business, "IWPB — Wealth")
+
+    def test_an_off_list_business_is_refused(self):
+        p = plan()
+        with self.assertRaises(PlanningError):
+            actions.set_business(p, "3.1", "Made Up Division", user="Jacob")
 
 
 class Capacity(unittest.TestCase):

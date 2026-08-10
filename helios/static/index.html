@@ -197,6 +197,62 @@
     font-size:12px; color:var(--muted); }
   @media(max-width:1100px){ .dashwrap{grid-template-columns:1fr 1fr} .refgrid{grid-template-columns:1fr}
     .gengrid{grid-template-columns:1fr} .hs-grid{grid-template-columns:1fr} }
+  /* --- inline row editing, as the prototype's dense table does it --- */
+  #backlogTable th, #backlogTable td { padding:5px 6px; font-size:12px; }
+  #backlogTable .dom-pill { font-size:10px; padding:2px 6px; }
+  .sccell { position:relative; text-align:center; }
+  .scin { width:38px; text-align:center; font:inherit; font-size:12px; font-weight:600;
+    padding:2px 0; border:1px solid transparent; border-radius:4px; }
+  .scin:hover, .scin:focus { border-color:var(--blue); outline:none; }
+  .scin.s5 { background:#f6dcd8; color:var(--crit); } .scin.s4 { background:#fce8e6; color:var(--high); }
+  .scin.s3 { background:#fdf2d9; color:var(--med); }
+  .scin.s2, .scin.s1 { background:#eef3ee; color:var(--low); }
+  .sccell.changed { box-shadow:inset 0 0 0 2px var(--blue); border-radius:5px; }
+  .chgdot { position:absolute; top:0; right:3px; color:var(--blue); font-size:15px; line-height:1; }
+  .prioin { width:58px; text-align:center; padding:3px 4px; border:1px solid var(--border);
+    border-radius:5px; font:inherit; font-size:12px; font-weight:700; color:var(--navy); }
+  .prioin:hover, .prioin:focus { border-color:var(--blue); outline:none; }
+  .prioin.ovr { border-color:var(--blue); background:var(--blue-soft); }
+  .prioin.pend { border-color:var(--warn); background:#fffbea; }
+  .composite { font-weight:700; color:var(--navy); }
+  .txin { width:100%; max-width:130px; padding:3px 5px; border:1px solid var(--border);
+    border-radius:5px; font:inherit; font-size:11px; }
+  .txin:hover, .txin:focus { border-color:var(--blue); outline:none; }
+  .effsel { padding:3px 4px; border:1px solid var(--border); border-radius:5px; font:inherit;
+    font-size:11px; background:#fff; }
+  .colfilt { display:block; margin-top:4px; max-width:110px; font:inherit; font-size:10px;
+    font-weight:400; padding:2px 3px; border:1px solid rgba(255,255,255,.4); border-radius:4px;
+    background:rgba(255,255,255,.14); color:#fff; text-transform:none; letter-spacing:0; }
+  .colfilt option { color:var(--ink); }
+  .flagchip { font-size:11px; padding:2px 7px; border-radius:999px; background:#fbeeec;
+    color:var(--over); border:1px solid #e6c9c4; }
+  .descope-tag { font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:999px;
+    background:#ecebe6; color:var(--muted); border:1px solid var(--border); }
+  .stew { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px;
+    border-radius:999px; margin-top:3px; white-space:nowrap; }
+  .stew.ok { background:#eef7ee; color:var(--low); border:1px solid #bcdcbc; }
+  .stew.no { background:#fdf2d9; color:#8e6b12; border:1px solid #eeddb0; }
+  .origin-cell { vertical-align:top; white-space:nowrap; }
+  .loc-cell { vertical-align:top; min-width:130px; }
+  .locadd { max-width:120px; font-size:10px; margin-top:2px; }
+  .rmrev { cursor:pointer; border:none; background:none; color:var(--over); font-size:13px; }
+  tr.detail td { background:#f7f9fc !important; padding:0; border-bottom:2px solid var(--border); }
+  tr.detail .dwrap { padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  tr.detail .box h5 { margin:0 0 6px; font-size:11px; text-transform:uppercase;
+    letter-spacing:.06em; color:var(--muted); }
+  tr.detail .box.full { grid-column:1 / -1; }
+  .pendbox { background:#fffbea; border:1px solid #f0e2a5; border-radius:8px; padding:10px 12px; }
+  .pendbox b { color:#6b5a16; font-size:13px; }
+  .commentlog .c { font-size:12px; padding:5px 8px; background:#fff; border:1px solid var(--border);
+    border-radius:6px; margin-bottom:4px; }
+  .commentlog .c .meta { color:var(--muted); font-size:11px; }
+  .teamsel, .subsel { font:inherit; font-size:13px; padding:5px 9px; border:1px solid var(--blue);
+    border-radius:6px; background:var(--blue-soft); color:var(--navy); font-weight:600; }
+  .subsel { border-color:var(--warn); background:#fdf2d9; color:#8e6b12; }
+  @media(max-width:900px){ tr.detail .dwrap { grid-template-columns:1fr; } }
+  .gate { border:1px solid var(--border); background:var(--panel); border-radius:8px; padding:10px 12px; }
+  .sgnnote { width:100%; min-height:38px; padding:6px; border:1px solid var(--border);
+    border-radius:6px; font:inherit; font-size:12px; resize:vertical; }
 </style>
 </head>
 <body>
@@ -240,7 +296,7 @@ let spec = null;      // the Helios column spec
 let tab = "radar";
 let user = localStorage.getItem("iap_user") || "";
 const open = { radar: new Set(), pre: new Set(), appr: new Set() };
-let filters = { team: "", sub: "", business: "", location: "" };
+let filters = { team: "", sub: "", business: "", location: "", route: "", status: "" };
 let sort = { key: "priority", dir: -1 };
 
 function toast(text, kind = "err") {
@@ -348,54 +404,122 @@ function renderTabs() {
 }
 
 /* ============================================================ Risk Radar */
-function filterBar() {
-  const teams = [...new Set(reviews().map((r) => r.assurance_function))].sort();
-  const subs = [...new Set(reviews().map((r) => r.sub_team).filter(Boolean))].sort();
-  const sel = (id, label, list, cur) => `<label class="small">${label}
-    <select data-filter="${id}">
-      <option value="">All</option>
-      ${list.map((o) => `<option ${o === cur ? "selected" : ""}>${esc(o)}</option>`).join("")}
-    </select></label>`;
-  return sel("team", "Team", teams, filters.team)
-    + sel("sub", "Sub-team", subs, filters.sub)
-    + sel("business", "Business", plan.options.businesses, filters.business)
-    + sel("location", "Location", plan.options.locations, filters.location);
+/* Follows the prototype: the table is the workspace. Scores, priority, business,
+   location and effort are all edited in the row; the drawer is for rationale and notes. */
+
+let pendingPrio = {};   // ref -> priority awaiting its rationale, as the prototype does
+
+function teamOptions() {
+  return [...new Set(reviews().map((r) => r.assurance_function))].sort();
+}
+function subTeamOptions() {
+  const subs = plan.options.sub_teams[filters.team];
+  return subs ? [...subs] : [];
 }
 
+function filterBar() {
+  const sel = (key, label, list, cls) => `<label class="small">${label}
+    <select data-filter="${key}" class="${cls || ""}">
+      <option value="">All ${label.toLowerCase()}s</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select></label>`;
+  const subs = subTeamOptions();
+  return sel("team", "Team", teamOptions(), "teamsel")
+    + (subs.length ? sel("sub", "Sub-team", subs, "subsel") : "");
+}
+
+/** Mandated reviews are pinned to the top whatever the sort, as in the prototype. */
 function sortedRadar() {
-  const rows = reviews().filter(matches);
   const key = sort.key;
-  const val = (r) => key === "priority" ? (r.effective_priority ?? (r.mandated ? 99 : 0))
+  const val = (r) => key === "priority" ? (r.effective_priority ?? 0)
     : key === "effort" ? r.fte
     : key === "ref" ? r.ref
     : (r.scores ? r.scores[key] : 0);
-  return rows.sort((a, b) => {
+  return reviews().filter(matches).sort((a, b) => {
+    if (a.mandated !== b.mandated) return a.mandated ? -1 : 1;
     const x = val(a), y = val(b);
     return (typeof x === "string" ? x.localeCompare(y) : x - y) * sort.dir;
   });
 }
 
+function scoreCell(r, key) {
+  if (!r.scores) return `<td class="sccell"><span class="muted">—</span></td>`;
+  const v = r.scores[key];
+  const changed = (r.scores_edited || []).includes(key);
+  const was = changed ? ` — scoring engine said ${r.seeded_scores[key]}` : "";
+  return `<td class="sccell ${changed ? "changed" : ""}">
+    <input class="scin s${Math.round(v)}" type="number" min="1" max="5" step="0.5"
+      value="${v}" data-score="${r.ref}|${key}"
+      title="${esc(plan.options.drivers.find((d) => d.key === key).label)}${was}" />
+    ${changed ? '<span class="chgdot" title="edited by hand">•</span>' : ""}</td>`;
+}
+
+function originCell(r) {
+  const cls = r.origin === "Regulatory Assurance" ? "o-reg"
+    : r.origin === "Risk Assurance" ? "o-risk" : "o-radar";
+  const steward = r.origin === "Risk Radar inputs"
+    ? `<div class="stew ${r.steward_consulted ? "ok" : "no"}"
+         title="${r.steward_consulted ? "Steward consulted — " + esc(r.steward_name) : "Risk steward not yet consulted"}"
+       >${r.steward_consulted ? "✓ " + esc(r.steward_name || "steward") : "steward?"}</div>` : "";
+  return `<td class="origin-cell"><span class="origin ${cls}">${esc(r.origin)}</span>${steward}</td>`;
+}
+
+function locCell(r) {
+  const spare = plan.options.locations.filter((l) => !r.locations.includes(l));
+  return `<td class="loc-cell">
+    ${r.locations.map((l) => `<span class="locchip">${esc(l)}<button class="lx"
+        data-locrm="${r.ref}|${esc(l)}" title="remove">✕</button></span>`).join("")}
+    <select class="txin locadd" data-locadd="${r.ref}">
+      <option value="">+ add…</option>
+      ${spare.map((l) => `<option>${esc(l)}</option>`).join("")}
+    </select></td>`;
+}
+
+function effortSelect(r) {
+  return `<select class="effsel" data-size="${r.ref}" title="Effort size">
+    ${plan.options.sizes.map((s) => `<option value="${s.value}" ${s.value === r.effort_size ? "selected" : ""}
+      >${s.value} · ${s.days}d</option>`).join("")}</select>`;
+}
+
 function renderRadar() {
   const w = plan.weights;
-  const drivers = plan.options.drivers;
   const rows = sortedRadar();
-
-  const head = (k, label) =>
-    `<th class="sortable" data-sort="${k}">${label}${sort.key === k ? (sort.dir < 0 ? " ▼" : " ▲") : ""}</th>`;
+  const head = (k, label) => `<th class="sortable" data-sort="${k}">${label}${
+    sort.key === k ? (sort.dir < 0 ? " ▼" : " ▲") : ""}</th>`;
+  const colFilter = (key, list) => `<select data-filter="${key}" class="colfilt">
+      <option value="">all</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select>`;
 
   return `
   <details class="help">
-    <summary>⚖ Priority weights <span class="muted small" style="font-weight:400">— the four
-      scores are read-only facts from the scoring engine; the weights are your lever</span></summary>
+    <summary>How to use this tool</summary>
     <div>
-      <div class="weights">${drivers.map(({ key, label }) => `
+      <ol>
+        <li><b>Risk Radar</b> — candidates scored on four factors. Set the <b>weights</b> to
+          reflect what matters most; priority = a·Risk + b·Urgency + c·Coverage gap + d·Change.
+          Edit a score or a priority in the row — a priority override needs a rationale.
+          Mandated reviews (★) are pinned to the top and are not scored.</li>
+        <li><b>Staging &amp; capacity</b> — fit the plan to FTE per quarter and phase it Q1→Q4.</li>
+        <li><b>Approval</b> — one sign-off gate per review, routed IRR / RCA / standard.</li>
+        <li><b>Pre-staging</b> — capture the Helios attributes and export the bulk upload.</li>
+        <li><b>Audit trail</b> — every decision, against the name in the header.</li>
+      </ol>
+      <p class="muted">Un-staging a review takes effect at once and opens the drawer for a
+        reason. Until one is recorded the review is flagged <b>reason req.</b> and counted
+        on the tab.</p>
+    </div>
+  </details>
+
+  <details class="help">
+    <summary>⚖ Priority weights <span class="muted small" style="font-weight:400">— the four
+      scores come from the scoring engine; the weights are your lever</span></summary>
+    <div>
+      <div class="weights">${plan.options.drivers.map(({ key, label }) => `
         <div class="wt">
           <label><b>${label}</b> <span class="val">${w[key].toFixed(1)}</span></label>
           <input type="range" min="0" max="3" step="0.1" value="${w[key]}" data-weight="${key}" />
         </div>`).join("")}
-      </div>
-      <div class="muted small" style="margin-top:8px">
-        priority = (a·risk + b·urgency + c·coverage gap + d·change) ÷ (a+b+c+d) — always on the 1–5 scale.
       </div>
       <div style="margin-top:10px"><button class="btn ghost" id="w-reset">Reset to equal weighting</button></div>
     </div>
@@ -416,97 +540,107 @@ function renderRadar() {
     ${filterBar()}
     <button class="btn" id="stage-high">Stage all Critical + High</button>
     <button class="btn ghost" id="stage-clear">Clear staging (keep mandated)</button>
-    <span class="muted small">★ mandated reviews are pinned and cannot be descoped.</span>
+    <span class="muted small">★ mandated reviews are pinned to the top. Effective priority
+      reflects your overrides.</span>
   </div>
 
   <div class="panel" style="padding:0;overflow-x:auto">
-    <table><thead><tr>
-      <th>In plan</th><th></th>${head("ref", "Ref")}<th>Candidate review</th><th>Risk taxonomy</th>
+    <table id="backlogTable"><thead><tr>
+      <th>Stage</th><th></th>${head("ref", "Ref")}<th>Candidate review</th><th>Risk taxonomy</th>
       ${head("risk", "Risk")}${head("urgency", "Urgency")}${head("coverage_gap", "Coverage")}
       ${head("change", "Change")}${head("priority", "Priority")}
-      <th>Origin</th><th>Team</th><th>Business</th><th>Location(s)</th>${head("effort", "Effort")}<th></th>
-    </tr></thead><tbody>
-      ${rows.map(radarRow).join("")}
+      <th>Origin</th><th>Team</th>
+      <th>Business${colFilter("business", plan.options.businesses)}</th>
+      <th>Location${colFilter("location", plan.options.locations)}</th>
+      ${head("effort", "Effort")}<th></th>
+    </tr></thead><tbody>${rows.map(radarRow).join("")
+      || '<tr><td colspan="16" class="muted">No reviews match these filters.</td></tr>'}
     </tbody></table>
-  </div>
-  ${rows.length ? "" : '<p class="muted">Nothing matches these filters.</p>'}`;
+  </div>`;
 }
 
 function radarRow(r) {
-  const s = r.scores;
-  const sc = (v) => v == null ? "—" : `<span class="sc s${Math.round(v)}">${v}</span>`;
   const isOpen = open.radar.has(r.ref);
-  const detail = isOpen ? `
-    <tr><td colspan="16" style="background:#f7f9fc">
-      <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div>
-          <div class="dashttl">Priority override</div>
-          ${r.mandated ? '<p class="muted small">Mandated reviews are pinned and not scored.</p>' : `
-          <div class="rowactions">
-            <input type="number" step="0.05" min="0" max="5" style="width:80px"
-              value="${r.priority_override ?? num(r.computed_priority)}" data-ovr-val="${r.ref}" />
-            <button class="btn sm" data-ovr="${r.ref}">Set override</button>
-            ${r.priority_override != null
-              ? `<button class="btn sm ghost" data-ovr-clear="${r.ref}">Clear</button>` : ""}
-          </div>
-          <textarea data-ovr-why="${r.ref}" placeholder="Rationale — required">${esc(r.priority_rationale)}</textarea>
-          <div class="muted small">computed ${num(r.computed_priority)}${
-            r.priority_override != null ? ` · override ${num(r.priority_override)}` : ""}</div>`}
-        </div>
-        <div>
-          <div class="dashttl">${r.in_plan ? "Descope" : "Rationale"}</div>
-          ${r.mandated ? '<p class="muted small">Cannot be taken out of the plan.</p>' : `
-          <textarea data-desc-why="${r.ref}" placeholder="Why is this review not in the plan?">${esc(r.descope_rationale)}</textarea>
-          <div class="rowactions" style="margin-top:6px">
-            <button class="btn sm" data-desc="${r.ref}">Record and descope</button>
-          </div>`}
-          <div class="dashttl" style="margin-top:10px">Locations</div>
-          <div>${r.locations.map((l) => `<span class="locchip">${esc(l)}
-            <button data-locrm="${r.ref}|${esc(l)}" title="remove">✕</button></span>`).join("")
-            || '<span class="muted small">none</span>'}</div>
-          <select data-locadd="${r.ref}" style="margin-top:5px">
-            <option value="">+ add location…</option>
-            ${plan.options.locations.filter((l) => !r.locations.includes(l))
-              .map((l) => `<option>${esc(l)}</option>`).join("")}
-          </select>
-        </div>
-        <div style="grid-column:1/-1">
-          <div class="dashttl">Notes</div>
-          ${r.comments.map((c) => `<div class="small" style="padding:4px 0;border-bottom:1px solid var(--border)">
-            ${esc(c.text)} <span class="muted">— ${esc(c.user)}, ${esc((c.at || "").slice(0, 16).replace("T", " "))}</span>
-          </div>`).join("") || '<span class="muted small">none</span>'}
-          <div class="rowactions" style="margin-top:6px">
-            <input type="text" data-note="${r.ref}" placeholder="add a note" style="flex:1 1 300px" />
-            <button class="btn sm" data-note-add="${r.ref}">Add note</button>
-            ${r.origin === "Risk Radar inputs" ? `
-              <input type="text" data-stew="${r.ref}" placeholder="risk steward consulted"
-                     value="${esc(r.steward_name)}" />
-              <button class="btn sm" data-stew-set="${r.ref}">Record steward</button>` : ""}
-          </div>
-        </div>
-      </div></td></tr>` : "";
+  const pending = pendingPrio[r.ref];
+  const flag = r.rationale_outstanding
+    ? ' <span class="flagchip">reason req.</span>'
+    : (r.descoped ? ' <span class="descope-tag">descoped</span>' : "");
+  const prioCls = pending != null ? "pend" : (r.priority_override != null ? "ovr" : "");
+  const prioTitle = r.priority_override != null
+    ? `overridden — computed ${num(r.computed_priority)}`
+    : "computed priority — edit to override (rationale required)";
 
-  return `<tr class="${r.descoped ? "descoped" : ""}">
-    <td><input type="checkbox" ${r.in_plan ? "checked" : ""} ${r.mandated ? "disabled" : ""}
-        data-stage="${r.ref}" title="${r.mandated ? "mandated — always in plan" : "stage into the plan"}" /></td>
-    <td>${r.mandated ? '<span class="star">★</span>' : ""}</td>
-    <td><b>${esc(r.ref)}</b></td>
-    <td>${esc(r.title)}${r.rationale_outstanding
-      ? ' <span class="muted small">· no rationale</span>' : ""}</td>
-    <td><span class="dom-pill">${esc(r.taxonomy_label)}</span></td>
-    <td>${sc(s && s.risk)}</td><td>${sc(s && s.urgency)}</td>
-    <td>${sc(s && s.coverage_gap)}</td><td>${sc(s && s.change)}</td>
-    <td><span class="band ${r.band}">${r.band}</span>
-      ${r.effective_priority != null ? ` <b>${num(r.effective_priority)}</b>` : ""}
-      ${r.priority_override != null ? ' <span class="muted small">ovr</span>' : ""}</td>
-    <td><span class="origin ${r.origin === "Regulatory Assurance" ? "o-reg"
-      : r.origin === "Risk Assurance" ? "o-risk" : "o-radar"}">${esc(r.origin)}</span></td>
-    <td class="small">${esc(r.assurance_function)}${r.sub_team ? `<br><span class="muted">${esc(r.sub_team)}</span>` : ""}</td>
-    <td class="small">${esc(r.business || "—")}</td>
-    <td class="small">${esc(r.locations.join(", ") || "—")}</td>
-    <td class="small">${r.effort_size} · ${r.fte} FTE</td>
-    <td><button class="btn sm ghost" data-open="${r.ref}">${isOpen ? "▴" : "▾"}</button></td>
-  </tr>${detail}`;
+  const main = `<tr class="${r.descoped || r.rationale_outstanding ? "descoped" : ""}">
+    <td><input type="checkbox" data-stage="${r.ref}" ${r.staged ? "checked" : ""}
+        title="${r.mandated ? "Mandated — taking it out needs a rationale" : "In the plan"}" /></td>
+    <td><button class="btn sm ghost" data-toggle="${r.ref}" title="Notes, descope &amp; rationale"
+        >${isOpen ? "▴" : "▾"}</button></td>
+    <td class="composite">${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</td>
+    <td>${esc(r.title)}${r.go_live ? ` <span class="muted small">· live ${esc(r.go_live)}</span>` : ""}${flag}
+      ${r.comment_count ? `<span class="muted small"> 💬${r.comment_count}</span>` : ""}</td>
+    <td><span class="dom-pill" title="${esc(r.taxonomy_label)}">${esc(r.taxonomy_short)}</span></td>
+    ${scoreCell(r, "risk")}${scoreCell(r, "urgency")}${scoreCell(r, "coverage_gap")}${scoreCell(r, "change")}
+    <td class="composite">${r.mandated ? '<span class="muted">—</span>'
+      : `<input class="prioin ${prioCls}" type="number" step="0.1" min="0" max="5"
+           value="${(pending != null ? pending : (r.effective_priority ?? 0)).toFixed(2)}"
+           data-prio="${r.ref}" title="${esc(prioTitle)}" />`}</td>
+    ${originCell(r)}
+    <td class="small team-cell" title="${esc(r.assurance_function)}${r.sub_team ? " · " + esc(r.sub_team) : ""}"
+      >${esc(r.function_short)}${r.sub_team ? `<div class="muted" style="font-size:11px">${esc(r.sub_team)}</div>` : ""}</td>
+    <td class="small"><select class="txin" data-business="${r.ref}">
+      <option value="">—</option>
+      ${plan.options.businesses.map((b) => `<option ${r.business === b ? "selected" : ""}>${esc(b)}</option>`).join("")}
+    </select></td>
+    ${locCell(r)}
+    <td class="small">${effortSelect(r)}</td>
+    <td>${r.ref.startsWith("EXT-") || r.ref.startsWith("RSK-")
+      ? `<button class="rmrev" data-rmrev="${r.ref}" title="Remove this review">✕</button>` : ""}</td>
+  </tr>`;
+
+  return main + (isOpen ? detailRow(r) : "");
+}
+
+function detailRow(r) {
+  const pending = pendingPrio[r.ref];
+  return `<tr class="detail"><td colspan="16"><div class="dwrap">
+    ${pending != null ? `<div class="box full pendbox">
+      <b>Priority override ${num(r.computed_priority)} → ${pending.toFixed(2)} — why?</b>
+      <textarea data-prio-why="${r.ref}" placeholder="Rationale — recorded against the review and the audit trail"></textarea>
+      <div class="rowactions" style="margin:8px 0 0">
+        <button class="btn sm primary" data-prio-confirm="${r.ref}">Confirm override</button>
+        <button class="btn sm ghost" data-prio-cancel="${r.ref}">Cancel</button>
+      </div></div>` : ""}
+
+    <div class="box">
+      <h5>${r.staged ? "Descope rationale" : "Why is this review not in the plan?"}</h5>
+      <textarea data-reason="${r.ref}" placeholder="Recorded against the review and the audit trail"
+        >${esc(r.descope_rationale)}</textarea>
+      <div class="rowactions" style="margin:6px 0 0">
+        <button class="btn sm" data-reason-save="${r.ref}">Save reason</button>
+        ${r.priority_override != null
+          ? `<button class="btn sm ghost" data-prio-reset="${r.ref}">Reset priority to computed</button>` : ""}
+        ${(r.scores_edited || []).length
+          ? `<button class="btn sm ghost" data-score-reset="${r.ref}">Reset scores</button>` : ""}
+      </div>
+      ${r.priority_rationale
+        ? `<div class="muted small" style="margin-top:6px">Override rationale: ${esc(r.priority_rationale)}</div>` : ""}
+    </div>
+
+    <div class="box">
+      <h5>Notes</h5>
+      <div class="commentlog">${r.comments.map((c) => `<div class="c">${esc(c.text)}
+        <div class="meta">${esc(c.user)} · ${esc((c.at || "").slice(0, 16).replace("T", " "))}</div></div>`).join("")
+        || '<span class="muted small">none</span>'}</div>
+      <div class="rowactions" style="margin:6px 0 0">
+        <input type="text" data-note="${r.ref}" placeholder="add a note" style="flex:1 1 200px" />
+        <button class="btn sm" data-note-add="${r.ref}">Add</button>
+      </div>
+      ${r.origin === "Risk Radar inputs" ? `<div class="rowactions" style="margin:6px 0 0">
+        <input type="text" data-stew="${r.ref}" placeholder="risk steward consulted"
+               value="${esc(r.steward_name)}" style="flex:1 1 200px" />
+        <button class="btn sm" data-stew-set="${r.ref}">Record steward</button></div>` : ""}
+    </div>
+  </div></td></tr>`;
 }
 
 function addForm(mandated) {
@@ -550,6 +684,7 @@ function renderStaging() {
     <h3>Bottom-up capacity fill <span class="sub">— mandated reviews (★) commit capacity first;
       the rest fill what remains. S = 2 · M = 3 · L = 4 FTE.</span></h3>
     <div class="rowactions">
+      ${filterBar()}
       <button class="btn" id="waterfall">Auto-fill quarters (waterfall Q1→Q4)</button>
       <button class="btn ghost" id="qclear">Clear quarters</button>
       <span class="muted small">${f.annual_fte_quarters} FTE-quarters a year ·
@@ -607,13 +742,16 @@ function renderPlan() {
   return `<div class="panel">
     <h3>Shaped plan <span class="sub">— the in-plan population by risk taxonomy, priority order.</span></h3>
     <div class="rowactions">
+      ${filterBar()}
       <button class="btn primary" onclick="location.href='/api/export/plan'">Export plan to CSV</button>
       <span class="muted small">${plan.stats.in_plan} reviews ·
         ${plan.stats.mandated} mandated · ${plan.stats.scheduled} scheduled</span>
     </div>
-    ${plan.shaped.map((g) => `
+    ${plan.shaped.map((g) => ({ ...g, reviews: g.reviews.filter(matches) }))
+      .filter((g) => g.reviews.length).map((g) => `
       <div class="plan-dom">
-        <h4>${esc(g.label)} <span class="muted small">— ${g.reviews.length} review(s), ${g.fte} FTE</span></h4>
+        <h4>${esc(g.label)} <span class="muted small">— ${g.reviews.length} review(s),
+          ${g.reviews.reduce((s, r) => s + r.fte, 0)} FTE</span></h4>
         ${g.reviews.map((r) => `<div class="plan-item">
           <div><b>${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</b> — ${esc(r.title)}
             <span class="band ${r.band}">${r.band}</span></div>
@@ -628,46 +766,89 @@ function renderPlan() {
 }
 
 /* ============================================================ Approval */
+function approvalScope() {
+  return inPlan().filter((r) => matches(r)
+    && (!filters.route || r.route === filters.route)
+    && (!filters.status || r.approval.status === filters.status));
+}
+
 function renderApproval() {
   const d = plan.approval;
+  const rows = approvalScope();
+  const sel = (key, label, list) => `<label class="small">${label}
+    <select data-filter="${key}"><option value="">All ${label.toLowerCase()}s</option>
+      ${list.map((o) => `<option ${o === filters[key] ? "selected" : ""}>${esc(o)}</option>`).join("")}
+    </select></label>`;
+
   return `<div class="panel">
     <h3>Approval <span class="sub">— one gate per review: IRR for regulator-mandated, RCA for
       RCA-linked, 1LOD / L2 for the rest. Returning a review needs a comment.</span></h3>
     <div class="rowactions">
+      ${filterBar()}
+      ${sel("route", "Route", ["IRR", "RCA", "Standard"])}
+      ${sel("status", "Status", ["Pending", "Approved", "Returned"])}
       <span class="appr Approved">${d.Approved} approved</span>
       <span class="appr Pending">${d.Pending} pending</span>
       <span class="appr Returned">${d.Returned} returned</span>
-      <button class="btn primary" onclick="location.href='/api/export/approvals'">Export approval view</button>
+      <button class="btn primary" onclick="location.href='/api/export/approvals'">Export view to CSV</button>
     </div>
-    ${inPlan().filter(matches).map(approvalRow).join("")
-      || '<p class="muted">Nothing in the plan to approve yet.</p>'}
+  </div>
+
+  <div class="panel" style="padding:0;overflow-x:auto">
+    <table><thead><tr>
+      <th></th><th>Ref</th><th>Review</th><th>Route</th><th>Gate</th><th>Team</th>
+      <th>Business</th><th>Quarter</th><th>FTE</th><th>Priority</th>
+      <th>Obligation</th><th>Related IRR</th><th>Status</th><th>Signed off</th>
+    </tr></thead><tbody>${rows.map(approvalRow).join("")
+      || '<tr><td colspan="14" class="muted">Nothing in the plan matches these filters.</td></tr>'}
+    </tbody></table>
   </div>`;
 }
 
 function approvalRow(r) {
   const isOpen = open.appr.has(r.ref);
-  return `<div class="hs-panel">
-    <div class="hs-head" data-appr-open="${r.ref}">
-      <div><b>${esc(r.ref)}</b> — ${esc(r.title)}
-        <div class="muted small">${esc(r.gate)} · ${esc(r.assurance_function)}
-          ${r.regulation ? ` · ${esc(r.regulation)}` : ""}
-          ${r.rris_ids.map((i) => `<span class="rris">${esc(i)}</span>`).join("")}
-          ${r.related_irr && r.related_irr.length
-            ? ` · <span class="muted">also IRR: ${r.related_irr.join(", ")}</span>` : ""}</div></div>
-      <div><span class="appr ${r.approval.status}">${r.approval.status}</span>
-        <span class="muted">${isOpen ? "▴" : "▾"}</span></div>
-    </div>
-    ${isOpen ? `<div style="padding:12px 14px;border-top:1px solid var(--border)">
-      ${r.approval.by ? `<div class="muted small">${esc(r.approval.status)} by ${esc(r.approval.by)}
-        on ${esc((r.approval.at || "").slice(0, 16).replace("T", " "))}${
-        r.approval.note ? ` — ${esc(r.approval.note)}` : ""}</div>` : ""}
-      <textarea data-sign-note="${r.ref}" placeholder="comment — required to return"></textarea>
-      <div class="rowactions" style="margin-top:8px">
-        <button class="btn sm primary" data-sign="${r.ref}|Approved">Approve</button>
-        <button class="btn sm" data-sign="${r.ref}|Returned">Return</button>
-      </div></div>` : ""}
-  </div>`;
+  const a = r.approval;
+  const gate = `<tr class="detail"><td colspan="14"><div class="dwrap">
+      <div class="box full gate">
+        <h5>${esc(r.gate)} — ${esc(r.ref)} ${esc(r.title)}</h5>
+        ${a.by ? `<div class="muted small" style="margin-bottom:6px">${esc(a.status)} by
+          ${esc(a.by)} on ${esc((a.at || "").slice(0, 16).replace("T", " "))}${
+          a.note ? ` — ${esc(a.note)}` : ""}</div>` : ""}
+        ${r.related_irr && r.related_irr.length ? `<div class="note" style="margin-bottom:8px">
+          Same obligation as ${r.related_irr.map(esc).join(", ")} — sign these off together
+          so one regulation is not assured twice in ignorance.</div>` : ""}
+        <textarea class="sgnnote" data-sign-note="${r.ref}"
+          placeholder="Comment — required to return, optional to approve"></textarea>
+        <div class="rowactions" style="margin:8px 0 0">
+          <button class="btn sm primary" data-sign="${r.ref}|Approved">Approve</button>
+          <button class="btn sm" data-sign="${r.ref}|Returned">Return</button>
+        </div>
+      </div></div></td></tr>`;
+
+  return `<tr>
+    <td><button class="btn sm ghost" data-appr-open="${r.ref}">${isOpen ? "▴" : "▾"}</button></td>
+    <td class="composite">${r.mandated ? '<span class="star">★</span> ' : ""}${esc(r.ref)}</td>
+    <td>${esc(r.title)}</td>
+    <td><span class="origin ${r.route === "IRR" ? "o-reg" : r.route === "RCA" ? "o-risk" : "o-radar"}"
+      >${esc(r.route)}</span></td>
+    <td class="small">${esc(r.gate)}</td>
+    <td class="small" title="${esc(r.assurance_function)}">${esc(r.function_short)}${
+      r.sub_team ? `<div class="muted" style="font-size:11px">${esc(r.sub_team)}</div>` : ""}</td>
+    <td class="small">${esc(r.business || "—")}</td>
+    <td>${r.planned_quarter || '<span class="muted">—</span>'}</td>
+    <td>${r.fte}</td>
+    <td><span class="band ${r.band}">${r.band}</span>${
+      r.effective_priority != null ? ` ${num(r.effective_priority)}` : ""}</td>
+    <td class="small">${esc(r.regulation || "—")}${
+      r.rris_ids.map((i) => `<span class="rris">${esc(i)}</span>`).join("")}</td>
+    <td class="small">${r.related_irr && r.related_irr.length
+      ? r.related_irr.map(esc).join(", ") : '<span class="muted">—</span>'}</td>
+    <td><span class="appr ${a.status}">${a.status}</span></td>
+    <td class="small">${a.by ? esc(a.by) : '<span class="muted">—</span>'}${
+      a.at ? `<div class="muted" style="font-size:11px">${esc(a.at.slice(0, 10))}</div>` : ""}</td>
+  </tr>${isOpen ? gate : ""}`;
 }
+
 
 /* ============================================================ Pre-staging (Helios) */
 function renderPre() {
@@ -677,6 +858,7 @@ function renderPre() {
     <h3>Helios pre-staging <span class="sub">— capture the Helios attributes for each in-plan
       review. Only fields in the Planning Key Fields spec are exported.</span></h3>
     <div class="rowactions">
+      ${filterBar()}
       <span class="small"><b>${ready} of ${rows.length}</b> Helios-ready</span>
       <button class="btn primary" id="export-helios" ${ready === rows.length && rows.length
         ? "" : "disabled"}>Export Helios bulk upload CSV</button>
@@ -852,7 +1034,11 @@ function on(sel, event, fn) {
 
 function wire() {
   // filters and sorting
-  on("[data-filter]", "onchange", (el) => { filters[el.dataset.filter] = el.value; render(); });
+  on("[data-filter]", "onchange", (el) => {
+    filters[el.dataset.filter] = el.value;
+    if (el.dataset.filter === "team") filters.sub = "";   // sub-teams belong to a team
+    render();
+  });
   on("[data-sort]", "onclick", (el) => {
     const k = el.dataset.sort;
     sort = { key: k, dir: sort.key === k ? -sort.dir : -1 };
@@ -864,42 +1050,67 @@ function wire() {
     op("weights", { weights: { [el.dataset.weight]: Number(el.value) } }));
   const reset = $("#w-reset"); if (reset) reset.onclick = () => op("weights.reset");
 
-  // staging
+  // staging — un-stage takes effect at once and opens the drawer for the reason
   on("[data-stage]", "onchange", (el) => {
     const ref = el.dataset.stage;
     if (el.checked) return op("stage", { ref });
-    const box = $("#view").querySelector(`[data-desc-why="${ref}"]`);
-    const rationale = box ? box.value : "";
-    if (!rationale.trim()) {
-      el.checked = true;
-      open.radar.add(ref);
-      render();
-      return toast("Record a rationale below before taking this review out of the plan.");
-    }
-    return op("descope", { ref, rationale });
+    open.radar.add(ref);
+    return op("unstage", { ref });
   });
-  on("[data-open]", "onclick", (el) => {
-    const ref = el.dataset.open;
+  on("[data-toggle]", "onclick", (el) => {
+    const ref = el.dataset.toggle;
     open.radar.has(ref) ? open.radar.delete(ref) : open.radar.add(ref);
     render();
   });
-  on("[data-desc]", "onclick", (el) => {
-    const ref = el.dataset.desc;
-    op("descope", { ref, rationale: $("#view").querySelector(`[data-desc-why="${ref}"]`).value });
+  on("[data-reason-save]", "onclick", (el) => {
+    const ref = el.dataset.reasonSave;
+    op("reason", { ref, rationale: $("#view").querySelector(`[data-reason="${ref}"]`).value });
   });
+  on("[data-rmrev]", "onclick", (el) => {
+    if (confirm(`Remove ${el.dataset.rmrev}? Seeded candidates are descoped, not deleted.`)) {
+      op("review.remove", { ref: el.dataset.rmrev });
+    }
+  });
+
+  // inline score editing
+  on("[data-score]", "onchange", (el) => {
+    const [ref, driver] = el.dataset.score.split("|");
+    op("score", { ref, driver, value: Number(el.value) });
+  });
+  on("[data-score-reset]", "onclick", (el) => op("score.reset", { ref: el.dataset.scoreReset }));
+
+  // inline business
+  on("[data-business]", "onchange", (el) =>
+    op("business", { ref: el.dataset.business, value: el.value }));
   const sh = $("#stage-high"); if (sh) sh.onclick = () => op("stage.critical_and_high");
   const sc = $("#stage-clear"); if (sc) sc.onclick = () => op("stage.clear");
 
-  // priority overrides
-  on("[data-ovr]", "onclick", (el) => {
-    const ref = el.dataset.ovr;
-    op("priority", {
-      ref,
-      value: Number($("#view").querySelector(`[data-ovr-val="${ref}"]`).value),
-      rationale: $("#view").querySelector(`[data-ovr-why="${ref}"]`).value,
-    });
+  // priority: typing in the row stages a pending value, the drawer captures the rationale
+  on("[data-prio]", "onchange", (el) => {
+    const ref = el.dataset.prio;
+    const r = byRef(ref);
+    const value = Number(el.value);
+    if (isNaN(value) || Math.abs(value - (r.computed_priority ?? 0)) < 0.005) {
+      delete pendingPrio[ref];
+      return r.priority_override != null ? op("priority.clear", { ref }) : render();
+    }
+    pendingPrio[ref] = Math.min(5, Math.max(0, value));
+    open.radar.add(ref);
+    render();
   });
-  on("[data-ovr-clear]", "onclick", (el) => op("priority.clear", { ref: el.dataset.ovrClear }));
+  on("[data-prio-confirm]", "onclick", async (el) => {
+    const ref = el.dataset.prioConfirm;
+    const why = $("#view").querySelector(`[data-prio-why="${ref}"]`).value;
+    if (!why.trim()) return toast("A rationale is required to override the computed priority.");
+    const value = pendingPrio[ref];
+    delete pendingPrio[ref];
+    await op("priority", { ref, value, rationale: why });
+  });
+  on("[data-prio-cancel]", "onclick", (el) => {
+    delete pendingPrio[el.dataset.prioCancel];
+    render();
+  });
+  on("[data-prio-reset]", "onclick", (el) => op("priority.clear", { ref: el.dataset.prioReset }));
 
   // notes, steward, locations
   on("[data-note-add]", "onclick", (el) => {

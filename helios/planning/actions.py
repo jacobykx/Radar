@@ -13,6 +13,7 @@ from __future__ import annotations
 from .. import reference as refdata
 from . import prestaging, scheduling, scoring, staging
 from .constants import (
+    DRIVERS,
     QUARTERS,
     ApprovalStatus,
     Band,
@@ -64,15 +65,40 @@ def stage(plan: Plan, ref: str, *, user: str) -> Review:
     return review
 
 
-def descope(plan: Plan, ref: str, rationale: str, *, user: str) -> Review:
-    """Rule 6: out of the plan, with a reason, and never deleted."""
+def unstage(plan: Plan, ref: str, *, user: str) -> Review:
+    """Take a review out of the plan straight away, reason to follow.
+
+    The prototype un-stages on the click and chases the rationale afterwards, flagging the
+    review until one is recorded. Refusing the click instead would stop a planner shaping
+    the plan at the speed they think. The rule still bites, just later: an outstanding
+    rationale is counted on the dashboard, badged on the Risk Radar tab, and listed on the
+    shaped plan, so nothing leaves the plan quietly.
+    """
     review = plan.review(ref)
-    text = staging.validate_descope(review, rationale)
+    if not review.staged:
+        return review
     review.staged = False
     review.planned_quarter = None
-    review.descope_rationale = text
-    plan.log(user, "Descoped", text, ref=ref)
+    detail = review.descope_rationale or "reason pending"
+    plan.log(user, "Staged OUT", detail, ref=ref)
     return review
+
+
+def set_reason(plan: Plan, ref: str, rationale: str, *, user: str) -> Review:
+    """Record why a review is out of the plan. This is what clears the outstanding flag."""
+    review = plan.review(ref)
+    text = (rationale or "").strip()
+    review.descope_rationale = text
+    plan.log(user, "Descope rationale" if text else "Descope rationale cleared",
+             text or "(cleared)", ref=ref)
+    return review
+
+
+def descope(plan: Plan, ref: str, rationale: str, *, user: str) -> Review:
+    """Un-stage and record the reason in one step, for callers that have both."""
+    text = staging.validate_descope(rationale)
+    unstage(plan, ref, user=user)
+    return set_reason(plan, ref, text, user=user)
 
 
 def stage_critical_and_high(plan: Plan, *, user: str) -> int:
@@ -112,6 +138,59 @@ def override_priority(plan: Plan, ref: str, value: float, rationale: str, *, use
     review.priority_rationale = text
     detail = f"{clamped:.2f}" + (f" (computed {computed:.2f})" if computed is not None else "")
     plan.log(user, "Priority overridden", f"{detail} — {text}", ref=ref)
+    return review
+
+
+def set_score(plan: Plan, ref: str, driver: str, value: float, *, user: str) -> Review:
+    """Edit one of the four driver scores in place, as the prototype's table allows.
+
+    The scores come from a scoring engine, so an edit here is a deliberate departure from
+    it. The original is kept on `seeded_scores` so the divergence stays visible and can be
+    reset, and every edit lands on the audit trail.
+    """
+    review = plan.review(ref)
+    if review.scores is None:
+        raise PlanningError(f"{ref} is not driver-scored, so its scores cannot be edited.")
+    if driver not in ("risk", "urgency", "coverage_gap", "change"):
+        raise PlanningError(f"{driver!r} is not one of the four drivers.")
+
+    clamped = min(5.0, max(1.0, float(value)))
+    before = getattr(review.scores, driver)
+    if clamped == before:
+        return review
+    if review.seeded_scores is None:
+        review.seeded_scores = review.scores  # first edit pins what the engine said
+
+    from dataclasses import replace as _replace
+    review.scores = _replace(review.scores, **{driver: clamped})
+    label = dict(DRIVERS)[driver]
+    plan.log(user, "Score edited", f"{label} {before:g} → {clamped:g}", ref=ref)
+    return review
+
+
+def reset_scores(plan: Plan, ref: str, *, user: str) -> Review:
+    """Put the driver scores back to what the scoring engine supplied."""
+    review = plan.review(ref)
+    if review.seeded_scores is None:
+        return review
+    review.scores = review.seeded_scores
+    review.seeded_scores = None
+    plan.log(user, "Scores reset", "back to the scoring engine's values", ref=ref)
+    return review
+
+
+def set_business(plan: Plan, ref: str, value: str, *, user: str) -> Review:
+    """Business is edited in the Risk Radar row and flows through to the Helios column."""
+    review = plan.review(ref)
+    text = (value or "").strip()
+    if text:
+        canonical, ok = refdata.normalise(text, tuple(plan.reference.get("business", ())))
+        if not ok:
+            raise PlanningError(f"{text!r} is not in the business reference list.")
+        text = canonical
+    review.business = text
+    review.helios["business"] = text
+    plan.log(user, "Business changed", text or "(cleared)", ref=ref)
     return review
 
 

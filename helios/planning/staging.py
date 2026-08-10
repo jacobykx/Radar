@@ -33,12 +33,15 @@ def validate_origin(origin: Origin, mandated: bool) -> None:
         )
 
 
-def validate_descope(review: Review, rationale: str | None) -> str:
-    """Un-staging always requires a recorded rationale (rule 6, decision D1)."""
-    if review.mandated:
-        raise RationaleRequired(
-            f"{review.ref} is regulator-mandated and cannot be taken out of the plan."
-        )
+def validate_descope(rationale: str | None) -> str:
+    """A descope recorded in one step still needs its reason (rule 6).
+
+    Mandated reviews are not exempt from being taken out. The prototype allows it, and it
+    is the right call: an externally mandated obligation that the plan cannot resource is a
+    fact governance needs on the record, not something to hide behind a disabled checkbox.
+    What the rules insist on is the reason, which `Review.rationale_outstanding` chases and
+    the exports refuse to ship without.
+    """
     text = (rationale or "").strip()
     if not text:
         raise RationaleRequired("A rationale is required to descope a review.")
