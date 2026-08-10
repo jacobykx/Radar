@@ -23,10 +23,20 @@ On **Windows**, use the launcher and run from the repository root — there is n
 install and `make` is not needed:
 
 ```powershell
-py -m helios
-py -m helios reviews.csv -o out.csv
-py -m unittest discover -s helios\tests -t .
+py -3.12 -m helios                          # the planning module on http://127.0.0.1:8000
+py -3.12 -m helios --data plans\2027.json   # keep the plan somewhere else
+py -3.12 -m helios reviews.csv -o out.csv   # convert a CSV without opening a browser
+py -3.12 -m unittest discover -s helios\tests -t .
 ```
+
+`-3.12` is worth being explicit about: bare `py` picks whichever interpreter is highest or
+whatever `PY_PYTHON` says, and the app uses `datetime.UTC`, which is 3.11+. An older one
+fails at import with a clear `ImportError` rather than misbehaving, but naming the version
+saves the round trip.
+
+The plan file is created in the **current directory** unless `--data` says otherwise, so
+run from the same place each time or pass an absolute path. The app prints the resolved
+path on startup, and creates the parent directory if it does not exist.
 
 CI runs the full suite on `windows-latest` as well as Linux, so "works on Windows" is a
 test result rather than an intention. See [Windows specifics](#windows-specifics) for what
@@ -179,8 +189,8 @@ what the export will enforce.
 
 ## Windows specifics
 
-Three things go wrong on Windows and nowhere else. All three are fixed and covered by
-tests that run on the Windows CI runner.
+Four things go wrong on Windows and nowhere else. All four are fixed and covered by tests
+that run on the Windows CI runner.
 
 **Excel does not save UTF-8 by default.** "CSV (Comma delimited)" — the top entry in the
 Save As dialog — writes cp1252. Reading that as UTF-8 aborts on the first em dash, and the
@@ -194,13 +204,21 @@ stdout as UTF-8 bytes, so it is the same file however it is redirected. `-o` was
 correct; the pipe was not.
 
 **Line endings get translated twice.** The writer already emits CRLF, and Windows text mode
-would turn each one into `\r\r\n`. The output file is opened with `newline=""` to stop that.
+would turn each one into `\r\r\n`. Both the exported CSV and the plan file are opened with
+an explicit `newline` to stop that.
 
-One case is only mitigated, not fixed: the browser's **file picker** always decodes as
-UTF-8, so a cp1252 file loaded there arrives with replacement characters and the app cannot
-tell what it should have been. It detects them and says to re-save as "CSV UTF-8" rather
-than leaving you to work out why every business name is suddenly unrecognised. Pasting the
-text in, or using the CLI, avoids it entirely.
+**Saving the plan is where file locking usually bites.** There is no `fcntl` anywhere — it
+is Unix-only and is the classic way this breaks. Writes are serialised with a
+`threading.Lock`, and a save is atomic: a temp file alongside, then `os.replace`, which is
+atomic on Windows as well as POSIX. A crash mid-save leaves the previous plan intact rather
+than a half-written one, and a plan that cannot be serialised fails before anything on disk
+is touched. CI asserts the plan file survives a restart on the Windows runner.
+
+Importing a CSV of approved reviews is a **CLI or API path** (`py -3.12 -m helios
+reviews.csv`, or `POST /api/import`), and both decode cp1252 correctly. The planning UI has
+no file picker, which sidesteps the one case that cannot be fixed: `File.text()` in the
+browser always decodes as UTF-8, substituting replacement characters before any code of ours
+sees the bytes.
 
 Error messages contain em dashes and ellipses. On an older console code page that cannot
 encode them they degrade to `?` rather than raising — a crash while reporting an error is

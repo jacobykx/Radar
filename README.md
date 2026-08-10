@@ -123,6 +123,12 @@ Open **http://127.0.0.1:3010**.
 Everything runs natively — Python, Node, Poetry and npm all work, and the SQLite fallback
 needs no extra services. Two things differ.
 
+> **The [`helios/`](helios/README.md) planning module needs none of this.** It is standard
+> library only, so `py -3.12 -m helios` from the repository root is the whole thing — no
+> Poetry, no npm, no `make`, nothing to install. Its full suite runs on `windows-latest` in
+> CI. See [Windows specifics](helios/README.md#windows-specifics) for the encoding and
+> line-ending details that only matter there.
+
 **`make` is not installed by default.** The `make` targets above are a convenience, not a
 dependency; every one of them is a short command you can run directly. Either install it
 (`winget install GnuWin32.Make`, or `scoop install make`) or use the commands below. Note
