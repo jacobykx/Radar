@@ -54,7 +54,7 @@ dev: ## Print the two commands to run
 	@echo "  make dev-frontend   → http://127.0.0.1:3010"
 
 dev-backend: ## Run the API with reload
-	cd $(BACKEND) && .venv/bin/python -m uvicorn app.main:app --port 8010 --reload
+	cd $(BACKEND) && poetry run python -m uvicorn app.main:app --port 8010 --reload
 
 dev-frontend: ## Run the Next dev server
 	cd $(FRONTEND) && npm run dev
@@ -62,18 +62,18 @@ dev-frontend: ## Run the Next dev server
 # ── database ───────────────────────────────────────────────────────────────────
 
 migrate: ## Apply migrations up to head
-	cd $(BACKEND) && .venv/bin/alembic upgrade head
+	cd $(BACKEND) && poetry run alembic upgrade head
 
 migration: ## Autogenerate a revision: make migration M="add widget table"
 	@test -n "$(M)" || (echo "Set M, e.g. make migration M=\"add widget table\"" && exit 1)
-	cd $(BACKEND) && .venv/bin/alembic revision --autogenerate -m "$(M)"
+	cd $(BACKEND) && poetry run alembic revision --autogenerate -m "$(M)"
 	@echo "Review the generated file before committing — autogenerate is a draft."
 
 seed: ## Migrate and load the synthetic fixtures
-	cd $(BACKEND) && .venv/bin/python -m scripts.bootstrap
+	cd $(BACKEND) && poetry run python -m scripts.bootstrap
 
 reset: ## Drop everything, re-migrate, re-seed
-	cd $(BACKEND) && .venv/bin/python -m scripts.bootstrap --reset
+	cd $(BACKEND) && poetry run python -m scripts.bootstrap --reset
 
 # ── checks ─────────────────────────────────────────────────────────────────────
 
@@ -82,13 +82,13 @@ check: lint typecheck test build ## Everything CI runs
 test: test-backend test-frontend ## Run both test suites
 
 test-backend: ## pytest
-	cd $(BACKEND) && .venv/bin/python -m pytest
+	cd $(BACKEND) && poetry run python -m pytest
 
 test-frontend: ## jest
 	cd $(FRONTEND) && npm test
 
 lint: ## ruff
-	cd $(BACKEND) && .venv/bin/ruff check .
+	cd $(BACKEND) && poetry run ruff check .
 
 typecheck: ## tsc
 	cd $(FRONTEND) && npx tsc --noEmit

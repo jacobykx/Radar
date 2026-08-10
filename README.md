@@ -34,7 +34,8 @@ make dev-frontend   # http://127.0.0.1:3010
 ```
 
 `make help` lists every target. The rest of this section is what those targets do, for
-anyone who would rather run the steps by hand.
+anyone who would rather run the steps by hand — **including on Windows, where `make` is
+not present by default. See [On Windows](#on-windows).**
 
 ### Backend — http://127.0.0.1:8010
 
@@ -54,19 +55,22 @@ git-ignored:
 cd backend && cp .env.example .env
 ```
 
+<!-- Commands below use `poetry run`, which resolves the virtualenv the same way on every
+platform. `.venv/bin/...` would be `.venv\Scripts\...` on Windows. -->
+
 Create the schema and load the synthetic fixtures — 20 reviews ported from the
 prototype. The schema comes from Alembic, the same migrations a deployed environment
 runs, so a local database cannot drift from what SIT, UAT and PROD get. `--reset`
 downgrades to base first, so re-run it any time to get back to a clean plan:
 
 ```bash
-cd backend && .venv/bin/python -m scripts.bootstrap --reset
+cd backend && poetry run python -m scripts.bootstrap --reset
 ```
 
 Start it:
 
 ```bash
-cd backend && .venv/bin/python -m uvicorn app.main:app --port 8010 --reload
+cd backend && poetry run python -m uvicorn app.main:app --port 8010 --reload
 ```
 
 ### Frontend — http://127.0.0.1:3010
@@ -76,6 +80,55 @@ cd frontend && npm install && npm run dev
 ```
 
 Open **http://127.0.0.1:3010**.
+
+### On Windows
+
+Everything runs natively — Python, Node, Poetry and npm all work, and the SQLite fallback
+needs no extra services. Two things differ.
+
+**`make` is not installed by default.** The `make` targets above are a convenience, not a
+dependency; every one of them is a short command you can run directly. Either install it
+(`winget install GnuWin32.Make`, or `scoop install make`) or use the commands below. Note
+that even with `make` installed, `make clean` still won't work — it shells out to `find`
+and `rm`. Under WSL or Git Bash the whole Makefile works unchanged.
+
+**Virtualenv scripts live in `.venv\Scripts\`, not `.venv/bin/`.** Prefer `poetry run`,
+which resolves this for you and is identical on every platform. The commands in this
+README use it for that reason.
+
+The full setup in PowerShell, from the repository root:
+
+```powershell
+# Backend
+cd backend
+poetry config virtualenvs.in-project true --local
+poetry install
+Copy-Item .env.example .env
+poetry run python -m scripts.bootstrap --reset
+
+# Frontend, in the same shell
+cd ..\frontend
+npm install
+```
+
+Then two terminals:
+
+```powershell
+cd backend  ; poetry run python -m uvicorn app.main:app --port 8010 --reload
+cd frontend ; npm run dev
+```
+
+In `cmd.exe` the only changes are `copy .env.example .env` and `&&` in place of `;`.
+
+**One PowerShell gotcha.** `curl` is an alias for `Invoke-WebRequest`, which does not take
+`-H`. The RBAC example further down needs `curl.exe` explicitly:
+
+```powershell
+curl.exe -H "x-frame-user: someone" -H "x-frame-ad-groups: IAP_READER" http://127.0.0.1:8010/permission
+```
+
+Docker Desktop runs the containerised stack unchanged — `docker compose up --build`,
+`docker compose run --rm seed`, `docker compose down -v`.
 
 ### Postgres, in containers
 
@@ -125,6 +178,12 @@ cd frontend && npm run generate:api
 It reads `NEXT_PUBLIC_API_BASE` and falls back to `http://127.0.0.1:8010`. Regenerating
 is what turns a backend contract change into a compile error rather than a runtime one,
 so run it before assuming a frontend break is a frontend bug.
+
+The script behind it is `frontend/scripts/generate-api.mjs`, which calls
+openapi-typescript's API directly rather than shelling out. That is deliberate: the
+previous one-line npm script defaulted the URL with `${NEXT_PUBLIC_API_BASE:-...}`, which
+is POSIX shell syntax that `cmd.exe` passes through verbatim, so it fetched a literal
+`${...}` and failed on Windows.
 
 ---
 
@@ -220,7 +279,7 @@ and re-applies it on every build.
 |---|---|
 | Ports **8010** / **3010** | Local choices only — 8000 was already in use on the original development machine. FRAME serves both behind the platform |
 | `frontend/next.config.mjs` | `allowedDevOrigins` is a development-only workaround; `NEXT_PUBLIC_API_BASE` should come from environment configuration |
-| `frontend/package.json` | The `generate:api` URL points at localhost |
+| `frontend/scripts/generate-api.mjs` | The `generate:api` fallback URL points at localhost |
 | `Jenkinsfile` | The agent label and credential IDs are placeholders, confirmed during FRAME onboarding |
 | Branch names | FRAME's Jenkins triggers on `feature/all/<JIRA-TICKET>` |
 
@@ -259,6 +318,13 @@ make test-backend   # pytest — 35 cases
 make test-frontend  # jest — 13 cases
 ```
 
+Without `make` — on Windows, or anywhere else:
+
+```bash
+cd backend  && poetry run pytest      # 35 cases
+cd frontend && npm test               # 13 cases
+```
+
 The backend's 35 cases cover the methodology in `BUILD_INSTRUCTIONS.md` section 2. They
 are written against the services layer, before the UI, so a later refactor cannot quietly
 break the rules.
@@ -269,8 +335,8 @@ They stub `fetch` at setup module scope, because openapi-fetch captures `globalT
 when the client is constructed: a stub installed any later would leave the specs quietly
 talking to a real backend.
 
-If `make test-backend` reports `No module named pytest`, the dev dependencies were not
-installed — run `make setup-backend`.
+If either reports `No module named pytest`, the dev dependencies were not installed —
+run `poetry install` in `backend`.
 
 ---
 

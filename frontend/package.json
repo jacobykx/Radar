@@ -8,7 +8,7 @@
     "start": "next start -p 3010",
     "lint": "next lint",
     "test": "jest",
-    "generate:api": "openapi-typescript ${NEXT_PUBLIC_API_BASE:-http://127.0.0.1:8010}/openapi.json -o lib/api/generated/schema.d.ts"
+    "generate:api": "node scripts/generate-api.mjs"
   },
   "dependencies": {
     "next": "^16.3.0",
