@@ -1,69 +1,113 @@
 "use client";
 
-/** Shared plan state. One fetch, one refresh path, so every stage sees the same truth. */
-import { useCallback, useEffect, useState } from "react";
+/**
+ * The plan, bound to React.
+ *
+ * One instance document is the single source of truth for every stage. This hook owns
+ * it: it loads the hosted JSON, resumes the working copy if there is one, runs workflow
+ * commands against it and persists the result. Screens read through `lib/engine/select`
+ * and write through `run` -- they never mutate the document themselves.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { api, errorMessage, type Review } from "./api/client";
+import {
+  DEFAULT_INSTANCE_URL,
+  errorMessage,
+  fetchInstance,
+  select,
+  storage,
+  type InstanceDoc,
+} from "./engine";
+import type { CommandResult } from "./engine/workflow";
 
-export interface Weights {
-  risk: number;
-  urgency: number;
-  coverage_gap: number;
-  change: number;
+export type { Weights, Identity } from "./engine";
+
+export interface RunOutcome<R> {
+  ok: boolean;
+  result: R | null;
 }
 
-export interface Identity {
-  username: string;
-  ad_groups: string[];
-  roles: string[];
-}
-
-export function usePlan() {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [weights, setWeights] = useState<Weights | null>(null);
-  const [identity, setIdentity] = useState<Identity | null>(null);
-  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
+export function usePlan(url: string = DEFAULT_INSTANCE_URL) {
+  const [doc, setDoc] = useState<InstanceDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    const [list, w, s] = await Promise.all([
-      api.GET("/reviews", { params: { query: {} } }),
-      api.GET("/plan/weights", {}),
-      api.GET("/plan/summary", {}),
-    ]);
-    if (list.data) setReviews(list.data as Review[]);
-    if (w.data) setWeights(w.data as Weights);
-    if (s.data) setSummary(s.data as Record<string, unknown>);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    api.GET("/permission", {}).then((r) => {
-      if (r.data) setIdentity(r.data as unknown as Identity);
-    });
-    refresh().catch(() => {
-      setError("Cannot reach the backend. Is it running on " + process.env.NEXT_PUBLIC_API_BASE + "?");
-      setLoading(false);
-    });
-  }, [refresh]);
-
-  /** Run a mutation, surface the API's rejection message, then resync. */
-  const act = useCallback(
-    async (fn: () => Promise<{ error?: unknown }>) => {
-      setError(null);
-      const result = await fn();
-      if (result.error) {
-        setError(errorMessage(result.error));
-        return false;
+  /**
+   * Load the instance.
+   *
+   * The hosted document is the baseline; a working copy in local storage wins unless
+   * `fresh` is set, which is what "Reset to the hosted instance" does.
+   */
+  const load = useCallback(
+    async (fresh = false) => {
+      setLoading(true);
+      try {
+        const hosted = await fetchInstance(url);
+        if (fresh) {
+          storage.clearWorkingCopy(hosted.id);
+          setDoc(hosted);
+        } else {
+          setDoc(storage.loadWorkingCopy(hosted.id) ?? hosted);
+        }
+        setError(null);
+      } catch (cause) {
+        setError(
+          `${errorMessage(cause)} The UI reads its plan from ${url} — check that the instance ` +
+            "document is being served there.",
+        );
+      } finally {
+        setLoading(false);
       }
-      await refresh();
-      return true;
     },
-    [refresh],
+    [url],
   );
 
-  return { reviews, weights, identity, summary, error, setError, loading, refresh, act };
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /**
+   * Run one workflow command.
+   *
+   * A rule violation throws a `DomainError`, which is shown to the user and leaves the
+   * document exactly as it was -- the same contract the API answered a 4xx with.
+   */
+  const run = useCallback(
+    <R,>(command: (current: InstanceDoc) => CommandResult<R>): RunOutcome<R> => {
+      if (!doc) return { ok: false, result: null };
+      try {
+        const { doc: next, result } = command(doc);
+        setDoc(next);
+        storage.saveWorkingCopy(next);
+        setError(null);
+        return { ok: true, result };
+      } catch (cause) {
+        setError(errorMessage(cause));
+        return { ok: false, result: null };
+      }
+    },
+    [doc],
+  );
+
+  const reviews = useMemo(() => (doc ? select.reviews(doc) : []), [doc]);
+  const summary = useMemo(() => (doc ? select.planSummary(doc) : null), [doc]);
+
+  return {
+    doc,
+    url,
+    loading,
+    error,
+    setError,
+    identity: doc?.identity ?? null,
+    weights: doc?.weights ?? null,
+    reviews,
+    summary,
+    run,
+    /** Re-read the hosted document, keeping the working copy. */
+    reload: () => load(false),
+    /** Throw the working copy away and start again from the hosted instance. */
+    reset: () => load(true),
+  };
 }
 
 export type PlanState = ReturnType<typeof usePlan>;

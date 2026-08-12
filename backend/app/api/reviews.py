@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_plan, get_review
 from app.api.serialize import review_out, taxonomy_labels
-from app.auth.frame import CurrentUser, Role, get_current_user, require
+from app.auth.gateway import CurrentUser, Role, get_current_user, require
 from app.core.db import get_session
 from app.domain.constants import EffortSize, Origin, Quarter, ReferenceKind
 from app.models import AssuranceFunction, Plan, Review, ReviewScore, SubTeam

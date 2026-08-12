@@ -1,58 +1,38 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
-import { api, type Review } from "@/lib/api/client";
+import { APPROVAL_STATUSES, csv, select, workflow } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
 
 import { RationaleBox } from "./RiskRadar";
 
-interface Dashboard {
-  total: number;
-  by_status: Record<string, number>;
-  approved_pct: number;
-  by_origin: Record<string, number>;
-  by_route: Record<string, { total: number; approved: number }>;
-  linkage: Record<string, string[]>;
-}
-
 /** Approval: filters, per-review sign-off, bulk approve, and filter-reactive dashboards. */
 export function Approval({ plan }: { plan: PlanState }) {
-  const { act, refresh } = plan;
-  const [rows, setRows] = useState<Review[]>([]);
-  const [dash, setDash] = useState<Dashboard | null>(null);
+  const { doc, run } = plan;
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [f, setF] = useState({ team: "", business: "", location: "", route: "", status: "" });
 
-  const query = Object.fromEntries(Object.entries(f).filter(([, v]) => v)) as Record<string, string>;
+  const query = useMemo(
+    () => Object.fromEntries(Object.entries(f).filter(([, v]) => v)) as select.ApprovalFilters,
+    [f],
+  );
 
-  const load = useCallback(async () => {
-    const r = await api.GET("/approvals", { params: { query } });
-    if (r.data) {
-      const d = r.data as unknown as { reviews: Review[]; dashboard: Dashboard };
-      setRows(d.reviews);
-      setDash(d.dashboard);
-    }
-  }, [JSON.stringify(query)]);
-
-  useEffect(() => {
-    load();
-  }, [load, plan.reviews]);
+  // The view and its dashboard come from the same pass over the plan, so the cards
+  // always describe exactly the rows underneath them.
+  const view = useMemo(
+    () => (doc ? select.approvalView(doc, query) : null),
+    [doc, query],
+  );
+  const rows = view?.reviews ?? [];
+  const dash = view?.dashboard ?? null;
 
   const teams = [...new Set(plan.reviews.map((r) => r.assurance_function))].sort();
   const businesses = [...new Set(plan.reviews.map((r) => r.business).filter(Boolean))].sort() as string[];
   const locations = [...new Set(plan.reviews.flatMap((r) => r.locations))].sort();
 
-  const decide = async (ref: string, decision: "Approved" | "Returned", comment?: string) => {
-    const ok = await act(() =>
-      api.POST("/reviews/{ref}/approval", {
-        params: { path: { ref } },
-        body: { decision, comment: comment ?? null },
-      }),
-    );
-    if (ok) await load();
-    return ok;
-  };
+  const decide = (ref: string, decision: "Approved" | "Returned", comment?: string) =>
+    run((current) => workflow.decide(current, { ref, decision, comment: comment ?? null })).ok;
 
   return (
     <div className="panel">
@@ -85,20 +65,23 @@ export function Approval({ plan }: { plan: PlanState }) {
         ))}
         <button
           className="btn up"
-          onClick={async () => {
-            await api.POST("/approvals/bulk-approve", { body: query });
-            await refresh();
-            await load();
-          }}
+          onClick={() => run((current) => workflow.bulkApprove(current, query))}
         >
           ✓ Approve all in view
         </button>
-        <a
+        <button
           className="btn primary"
-          href={`${process.env.NEXT_PUBLIC_API_BASE}/approvals/export?${new URLSearchParams(query)}`}
+          disabled={!doc}
+          onClick={() =>
+            doc &&
+            csv.downloadCsv(
+              `${doc.plan.year}_IAP_approval_view.csv`,
+              csv.approvalRows(doc, query),
+            )
+          }
         >
           Export view to CSV
-        </a>
+        </button>
       </div>
 
       {dash && (
@@ -106,7 +89,7 @@ export function Approval({ plan }: { plan: PlanState }) {
           <div className="dashcard">
             <div className="dashttl">Sign-off status · {dash.total} reviews</div>
             <div className="funnel">
-              {["Pending", "Approved", "Returned"].map((s) => (
+              {APPROVAL_STATUSES.map((s) => (
                 <div className="fstep" key={s}>
                   <div className="fn">{dash.by_status[s] ?? 0}</div>
                   <div className="fl">{s}</div>

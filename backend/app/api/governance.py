@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_plan, get_review
 from app.api.plan import _csv_response
-from app.auth.frame import CurrentUser, Role, require
+from app.auth.gateway import CurrentUser, Role, require
 from app.core.db import get_session
 from app.domain import helios
 from app.domain.constants import ReferenceKind

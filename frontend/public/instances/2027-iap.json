@@ -1,0 +1,1031 @@
+{
+  "schema": "iap.instance/1",
+  "id": "2027-iap",
+  "plan": {
+    "year": 2027,
+    "name": "2027 Indicative Annual Plan"
+  },
+  "identity": {
+    "username": "poc.planner",
+    "ad_groups": [
+      "IAP_PLANNER",
+      "IAP_APPROVER",
+      "IAP_ADMIN"
+    ],
+    "roles": [
+      "Planner",
+      "Approver",
+      "Admin"
+    ]
+  },
+  "reference": {
+    "taxonomy": [
+      {
+        "code": "change-ai",
+        "label": "Change: data, models & AI"
+      },
+      {
+        "code": "op-res",
+        "label": "Operational resilience & third party"
+      },
+      {
+        "code": "prudential",
+        "label": "Prudential, credit & model risk"
+      },
+      {
+        "code": "fincrime",
+        "label": "Financial crime & AML"
+      },
+      {
+        "code": "conduct",
+        "label": "Conduct & Consumer Duty"
+      }
+    ],
+    "business": [
+      {
+        "code": "CIB — Global Banking",
+        "label": "CIB — Global Banking"
+      },
+      {
+        "code": "CIB — Markets & Securities Services",
+        "label": "CIB — Markets & Securities Services"
+      },
+      {
+        "code": "CIB — Global Payments Solutions",
+        "label": "CIB — Global Payments Solutions"
+      },
+      {
+        "code": "IWPB — Wealth",
+        "label": "IWPB — Wealth"
+      },
+      {
+        "code": "IWPB — Personal Banking",
+        "label": "IWPB — Personal Banking"
+      },
+      {
+        "code": "Global Functions — Finance",
+        "label": "Global Functions — Finance"
+      },
+      {
+        "code": "Global Functions — Risk & Compliance",
+        "label": "Global Functions — Risk & Compliance"
+      },
+      {
+        "code": "Global Functions — Technology",
+        "label": "Global Functions — Technology"
+      },
+      {
+        "code": "Corporate Centre",
+        "label": "Corporate Centre"
+      }
+    ],
+    "location": [
+      {
+        "code": "Global",
+        "label": "Global"
+      },
+      {
+        "code": "UK",
+        "label": "UK"
+      },
+      {
+        "code": "Hong Kong",
+        "label": "Hong Kong"
+      },
+      {
+        "code": "Mainland China",
+        "label": "Mainland China"
+      },
+      {
+        "code": "Singapore",
+        "label": "Singapore"
+      },
+      {
+        "code": "Malaysia",
+        "label": "Malaysia"
+      },
+      {
+        "code": "India",
+        "label": "India"
+      },
+      {
+        "code": "UAE",
+        "label": "UAE"
+      },
+      {
+        "code": "France",
+        "label": "France"
+      },
+      {
+        "code": "Germany",
+        "label": "Germany"
+      },
+      {
+        "code": "USA",
+        "label": "USA"
+      },
+      {
+        "code": "Canada",
+        "label": "Canada"
+      },
+      {
+        "code": "Mexico",
+        "label": "Mexico"
+      },
+      {
+        "code": "Brazil",
+        "label": "Brazil"
+      },
+      {
+        "code": "Australia",
+        "label": "Australia"
+      }
+    ]
+  },
+  "assurance_functions": [
+    {
+      "name": "Financial Crime Assurance",
+      "fte_per_quarter": 10,
+      "is_active": true
+    },
+    {
+      "name": "Regulatory Compliance Assurance",
+      "fte_per_quarter": 16,
+      "is_active": true
+    },
+    {
+      "name": "Traded Risk Assurance",
+      "fte_per_quarter": 8,
+      "is_active": true
+    },
+    {
+      "name": "Treasury Risk Assurance",
+      "fte_per_quarter": 8,
+      "is_active": true
+    },
+    {
+      "name": "Wholesale Credit Risk Unit Assurance",
+      "fte_per_quarter": 6,
+      "is_active": true
+    },
+    {
+      "name": "Regulatory Reporting Assurance",
+      "fte_per_quarter": 6,
+      "is_active": true
+    },
+    {
+      "name": "United States Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "China Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "Group Insurance Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "Continental Europe Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "Singapore Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "Malaysia Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    },
+    {
+      "name": "Innovation Bank Assurance",
+      "fte_per_quarter": 0,
+      "is_active": false
+    }
+  ],
+  "sub_teams": {
+    "Financial Crime Assurance": [
+      "Hong Kong (FC)",
+      "UK (FC)",
+      "CIB (FC)",
+      "Fraud",
+      "AML",
+      "Sanctions",
+      "IWPB (FC)"
+    ],
+    "Regulatory Compliance Assurance": [
+      "IWPB (RC)",
+      "MSS (RC)",
+      "CIB (RC)",
+      "CIB Asia & MENAT (RC)",
+      "Hong Kong (RC)",
+      "UK (RC)"
+    ]
+  },
+  "weights": {
+    "risk": 1,
+    "urgency": 1,
+    "coverage_gap": 1,
+    "change": 1
+  },
+  "reviews": [
+    {
+      "ref": "3.1",
+      "title": "SS1/23 model risk tested for AI/ML credibility",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "change-ai",
+      "assurance_function": "Traded Risk Assurance",
+      "sub_team": null,
+      "business": "Global Functions — Risk & Compliance",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 5,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "3.2",
+      "title": "Agentic AI in payments and markets",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "change-ai",
+      "assurance_function": "Traded Risk Assurance",
+      "sub_team": null,
+      "business": "CIB — Markets & Securities Services",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 3,
+        "coverage_gap": 5,
+        "change": 5,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "3.3",
+      "title": "Third-party model/AI concentration & explainability",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "change-ai",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "CIB (RC)",
+      "business": "Global Functions — Technology",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 3,
+        "coverage_gap": 3.5,
+        "change": 4,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "3.4",
+      "title": "Frontier AI as a cyber threat amplifier",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "change-ai",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "CIB (RC)",
+      "business": "Global Functions — Technology",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 5,
+        "urgency": 4,
+        "coverage_gap": 5,
+        "change": 5,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "3.5",
+      "title": "Data governance underneath the models",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "change-ai",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "MSS (RC)",
+      "business": "Global Functions — Risk & Compliance",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 3,
+        "coverage_gap": 3.5,
+        "change": 4,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "4.1",
+      "title": "New incident & material-third-party reporting regime",
+      "origin": "Regulatory Assurance",
+      "mandated": true,
+      "taxonomy_code": "op-res",
+      "assurance_function": "Regulatory Reporting Assurance",
+      "sub_team": null,
+      "business": "Global Functions — Technology",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "L",
+      "fte_override": null,
+      "regulator": "PRA / FCA",
+      "regulation": "PS7/26 · SS1/26 — operational incident & material third-party reporting",
+      "rris_ids": [
+        "RRIS-10421"
+      ],
+      "rca_linked": false,
+      "go_live": "2027-03-18",
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 5,
+        "coverage_gap": 5,
+        "change": 4,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": true,
+        "planned_quarter": "Q1",
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "4.2",
+      "title": "Critical Third Parties: first designations",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "op-res",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "CIB (RC)",
+      "business": "Global Functions — Technology",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 3,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "4.3",
+      "title": "SS1/21 post-transition: impact-tolerance credibility",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "op-res",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "UK (RC)",
+      "business": "CIB — Global Payments Solutions",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "4.4",
+      "title": "Change risk across the BAU run-rate",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "op-res",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "UK (RC)",
+      "business": "Global Functions — Technology",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 3,
+        "coverage_gap": 5,
+        "change": 5,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "5.1",
+      "title": "Basel 3.1 implementation & off-cycle Pillar 2 review",
+      "origin": "Regulatory Assurance",
+      "mandated": true,
+      "taxonomy_code": "prudential",
+      "assurance_function": "Treasury Risk Assurance",
+      "sub_team": null,
+      "business": "Global Functions — Finance",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "L",
+      "fte_override": null,
+      "regulator": "PRA",
+      "regulation": "PS1/26 — Basel 3.1 implementation",
+      "rris_ids": [
+        "RRIS-10388"
+      ],
+      "rca_linked": false,
+      "go_live": "2027-01-01",
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 5,
+        "coverage_gap": 4,
+        "change": 5,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": true,
+        "planned_quarter": "Q1",
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "5.2",
+      "title": "NBFI and private-credit exposure",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "prudential",
+      "assurance_function": "Wholesale Credit Risk Unit Assurance",
+      "sub_team": null,
+      "business": "CIB — Global Banking",
+      "locations": [
+        "UK",
+        "USA"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 5,
+        "urgency": 3,
+        "coverage_gap": 3.5,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "5.3",
+      "title": "AI-driven asset-price & private-credit risk",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "prudential",
+      "assurance_function": "Wholesale Credit Risk Unit Assurance",
+      "sub_team": null,
+      "business": "CIB — Markets & Securities Services",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 5,
+        "urgency": 3,
+        "coverage_gap": 5,
+        "change": 4,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "5.4",
+      "title": "Model risk on capital and IFRS 9 together",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "prudential",
+      "assurance_function": "Treasury Risk Assurance",
+      "sub_team": null,
+      "business": "Global Functions — Finance",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "6.1",
+      "title": "Transaction-monitoring effectiveness & move to analytics",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "fincrime",
+      "assurance_function": "Financial Crime Assurance",
+      "sub_team": "AML",
+      "business": "IWPB — Personal Banking",
+      "locations": [
+        "Hong Kong"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 4,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "6.2",
+      "title": "APP fraud and the PSR consolidation",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "fincrime",
+      "assurance_function": "Financial Crime Assurance",
+      "sub_team": "Fraud",
+      "business": "CIB — Global Payments Solutions",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 5,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "6.3",
+      "title": "Sanctions screening effectiveness & circumvention",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "fincrime",
+      "assurance_function": "Financial Crime Assurance",
+      "sub_team": "Sanctions",
+      "business": "CIB — Global Banking",
+      "locations": [
+        "UAE",
+        "UK",
+        "Hong Kong"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 2,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "6.4",
+      "title": "AML supervisory reform (watch & adapt)",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "fincrime",
+      "assurance_function": "Financial Crime Assurance",
+      "sub_team": "AML",
+      "business": "Global Functions — Risk & Compliance",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 3,
+        "urgency": 4,
+        "coverage_gap": 3,
+        "change": 2,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "7.1",
+      "title": "Consumer Duty: outcomes that evidence change",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "conduct",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "IWPB (RC)",
+      "business": "IWPB — Wealth",
+      "locations": [
+        "Hong Kong"
+      ],
+      "effort_size": "M",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": true,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 4,
+        "coverage_gap": 3.5,
+        "change": 2,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "7.2",
+      "title": "Non-financial misconduct becomes a Conduct Rule",
+      "origin": "Regulatory Assurance",
+      "mandated": true,
+      "taxonomy_code": "conduct",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "Hong Kong (RC)",
+      "business": "Global Functions — Risk & Compliance",
+      "locations": [
+        "Global"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": "FCA",
+      "regulation": "Non-financial misconduct — Conduct Rules expansion",
+      "rris_ids": [
+        "RRIS-10502"
+      ],
+      "rca_linked": false,
+      "go_live": "2026-09-01",
+      "is_custom": false,
+      "scores": {
+        "risk": 4,
+        "urgency": 5,
+        "coverage_gap": 5,
+        "change": 3,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": true,
+        "planned_quarter": "Q3",
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    },
+    {
+      "ref": "7.3",
+      "title": "Fair value on closed books and legacy products",
+      "origin": "Risk Radar inputs",
+      "mandated": false,
+      "taxonomy_code": "conduct",
+      "assurance_function": "Regulatory Compliance Assurance",
+      "sub_team": "IWPB (RC)",
+      "business": "IWPB — Wealth",
+      "locations": [
+        "UK"
+      ],
+      "effort_size": "S",
+      "fte_override": null,
+      "regulator": null,
+      "regulation": null,
+      "rris_ids": [],
+      "rca_linked": false,
+      "go_live": null,
+      "is_custom": false,
+      "scores": {
+        "risk": 3,
+        "urgency": 3,
+        "coverage_gap": 3.5,
+        "change": 2,
+        "source": "scoring-engine (synthetic)"
+      },
+      "item": {
+        "staged": false,
+        "planned_quarter": null,
+        "priority_override": null,
+        "priority_override_rationale": null,
+        "descope_rationale": null,
+        "row_version": 1
+      },
+      "approval": null,
+      "steward": null,
+      "notes": []
+    }
+  ],
+  "audit": [],
+  "versions": [],
+  "revision": 0
+}

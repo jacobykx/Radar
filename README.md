@@ -2,72 +2,166 @@
 
 A 2LOD assurance planning tool: turns risk-scoring output and externally-mandated
 obligations into a shaped, capacity-feasible, signed-off annual assurance plan, exported
-to Helios. Target platform is **FRAME**.
+to Helios.
+
+For the POC it runs as a **static site** — the workflow executes in the browser and the
+plan is a JSON document served alongside it. That makes hosting it a matter of copying a
+folder onto IIS; see [Hosting on Windows](#hosting-on-windows).
 
 See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 
 ---
 
+## How this POC is put together
+
+The workflow runs **in the UI**, the way the HTML prototype does, and the plan it works
+on is a **JSON instance document**. There is no database and no backend process in the
+loop:
+
+```
+frontend/public/instances/2027-iap.json   the instance — reference data, capacity,
+                                          20 candidate reviews, plan state
+frontend/lib/engine/                      the workflow — scoring, capacity, waterfall,
+                                          staging, sign-off, Helios, versions, audit
+frontend/lib/usePlan.ts                   loads the instance, runs commands, persists
+frontend/components/                      screens: render and call, never decide
+```
+
+The instance document is loaded once, held in the browser, and every change is applied
+to it by a command in `lib/engine/workflow.ts`. Two rules hold for every command: a
+methodology violation throws and leaves the document untouched, and a successful change
+appends to the audit trail in the same step. Screens read through `lib/engine/select.ts`
+and write through `plan.run(...)` — the same split the API enforced, moved inside the
+page.
+
+**The FastAPI service in `backend/` is unchanged and still the productionisation
+target.** Nothing was deleted from it; the POC simply does not call it. Two seams make
+the swap back a local change: `engine/instance.ts` (where the document comes from) and
+`engine/workflow.ts` (what may change it). Point the first at `GET /reviews` and move
+the second behind the API, and the screens above are untouched.
+
+### What the POC gives up, deliberately
+
+| | POC | Deployed build |
+|---|---|---|
+| Rule enforcement | in the browser | server-side, un-bypassable |
+| Identity and roles | carried in the instance document | authentication gateway (IIS Windows Authentication, a reverse proxy, or SSO) |
+| Concurrency | `row_version` checked locally; one user | 409 against a shared database |
+| Persistence | `localStorage`, plus export/import of the JSON | Postgres |
+
+Client-side role checks demonstrate the rule, they do not secure it — anything running
+in a browser can be edited by the person running it. That is the reason the rules also
+exist in `backend/app/domain`, and the reason both copies are covered by tests.
+
+---
+
 ## Running it locally
 
-Two processes. Start the backend first — the frontend's typed client is generated from
-its OpenAPI schema.
+Node 20 or later. One process:
 
-### Backend — http://127.0.0.1:8010
-
-FRAME uses Poetry, so `poetry install && poetry run ...` is the canonical path. On a
-machine without Poetry, a plain venv works — dev dependencies live in Poetry's dev
-group, which pip cannot read, so pytest is installed separately:
-
-```bash
-cd backend && python3 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/pip install pytest ruff
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-Create the local configuration. `auth_dev_mode` defaults to **false** so a deployment
-that forgets to configure it fails closed with a 401 rather than accepting anonymous
-callers as administrators — local development opts in through this file, which is
-git-ignored:
+Open **http://127.0.0.1:3010**. The commands are identical in PowerShell, Command
+Prompt and a POSIX shell.
 
-```bash
-cd backend && cp .env.example .env
+The instance loads from `/instances/2027-iap.json`. To point the UI at a different one,
+set `NEXT_PUBLIC_INSTANCE_URL` — in PowerShell:
+
+```powershell
+$env:NEXT_PUBLIC_INSTANCE_URL = "http://intranet/plans/2027-draft.json"
+npm run dev
 ```
 
-Create the schema and load the synthetic fixtures — 20 reviews ported from the
-prototype. `--reset` drops every table first, so re-run it any time to get back to a
-clean plan:
+### Working with instances
 
-```bash
-cd backend && .venv/bin/python -m scripts.bootstrap --reset
+- **Export instance JSON** (top of the page) downloads the working plan in the same
+  schema it was loaded from. Host that file and the next session starts where this one
+  finished — that is the whole "hosting through JSON" loop.
+- **Reset to hosted instance** discards the local working copy and re-reads the file.
+- Edits live in `localStorage` under `iap.instance.<id>`, so a reload resumes; nothing
+  is ever written back to the hosted file.
+
+### Regenerating the shipped instance
+
+`frontend/public/instances/2027-iap.json` is generated from the same synthetic fixtures
+the backend seeds from, so the two cannot drift:
+
+```powershell
+cd backend
+py -m scripts.export_instance
 ```
 
-Start it. Swagger is at [/docs](http://127.0.0.1:8010/docs):
+No dependencies, no database — `app/seed/data.py` is plain Python. Edit the fixtures
+there and re-run, or hand-edit the JSON for a one-off scenario.
 
-```bash
-cd backend && .venv/bin/python -m uvicorn app.main:app --port 8010 --reload
+---
+
+## Hosting on Windows
+
+### As a static site on IIS (recommended for the POC)
+
+The POC does no server-side work, so it exports to a folder of files:
+
+```powershell
+cd frontend
+npm ci
+npm run build:static
 ```
 
-### Frontend — http://127.0.0.1:3010
+That writes `frontend\out`. Copy its contents to the site's physical path — for example
+`C:\inetpub\wwwroot\iap` — and point an IIS site or application at it. No Node runtime
+and no application pool identity are needed on the server; it is static content.
 
-```bash
-cd frontend && npm install && npm run dev
+`public\web.config` is copied into the export, so the folder arrives already
+configured: `index.html` as the default document, a MIME mapping for `.json`, and
+caching disabled for `/instances` so a re-hosted plan is picked up on the next reload
+rather than after a cache expiry.
+
+**Serving under a sub-path.** An IIS *application* under a site (`https://host/iap`)
+needs the app built for that path, because the asset URLs are baked in at build time:
+
+```powershell
+$env:NEXT_BASE_PATH = "/iap"
+npm run build:static
 ```
 
-Open **http://127.0.0.1:3010**.
+The default instance URL follows `NEXT_BASE_PATH`, so `/iap/instances/2027-iap.json` is
+what the page requests. A site at the root needs no `NEXT_BASE_PATH`.
 
-### Regenerating the API client
+**Swapping the plan without redeploying.** Overwrite
+`<site>\instances\2027-iap.json` with an exported instance. Nothing else changes — the
+UI reads it on the next load. Keep the previous file if you want to roll back.
 
-`frontend/lib/api/generated/schema.d.ts` is generated from the backend's OpenAPI schema
-and **is committed**, so the repo type-checks and builds without a running backend.
-Never hand-write or hand-edit it — regenerate it whenever the API contract changes, with
-the backend running:
+### Under Node (IIS reverse proxy, a Windows service, or a container)
 
-```bash
-cd frontend && npm run generate:api
+If you would rather run the Next.js server — for example to serve it behind IIS with
+ARR, or to add server-side pieces later:
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npm start          # http://127.0.0.1:3010
 ```
 
-It reads `NEXT_PUBLIC_API_BASE` and falls back to `http://127.0.0.1:8010`. Regenerating
-is what turns a backend contract change into a compile error rather than a runtime one,
-so run it before assuming a frontend break is a frontend bug.
+To keep it running across reboots, register it as a Windows service with a supervisor
+such as [NSSM](https://nssm.cc/) or `sc.exe`, pointing at `node` with
+`node_modules\next\dist\bin\next start -p 3010` as the arguments and `frontend` as the
+working directory. Front it with IIS + Application Request Routing if it needs to sit
+under an existing host name.
+
+### Identity on a Windows host
+
+The POC takes its identity from the `identity` block of the instance document, so
+"who am I" is whatever that file says. To make it real, put the app behind IIS with
+Windows Authentication and run the backend, which reads `x-auth-user` and
+`x-auth-groups` from the gateway and maps AD groups to roles
+(`backend/app/auth/gateway.py`). Those header names are the contract between the two —
+change them in one place if your gateway sends different ones.
 
 ---
 
@@ -75,91 +169,101 @@ so run it before assuming a frontend break is a frontend bug.
 
 | Stage | Worth exercising |
 |---|---|
-| **Risk Radar** | Factor scores are read-only — there is no control to edit them. Type a new Priority, then confirm in the drawer: the override needs a rationale, and the computed value survives beside it. Descope a review and watch it drop out of every later stage. |
-| **Staging & capacity** | *Auto-fill quarters* runs the waterfall: Q1 first, mandated before priority, never exceeding a function's quarterly FTE. Anything that will not fit is reported, not absorbed. Shrink a function's capacity in the seed and re-run to see reviews come back unplaced. |
+| **Add a review** | Two forms at the top of Risk Radar. *Regulatory Assurance* files a mandated review: it is pinned into the plan and, given a go-live date, into that date's quarter, routes to IRR at sign-off, and links to any other review sharing its RRIS ID. *Risk Assurance* files a risk-led candidate into the backlog. Both refuse to save without a rationale, and neither asks for factor scores — those are the scoring engine's. |
+| **Risk Radar** | Factor scores are read-only — there is no control to edit them. Type a new Priority, then confirm in the drawer: the override needs a rationale, and the computed value survives beside it. Un-ticking Stage opens the descope box rather than un-staging on the spot. |
+| **Staging & capacity** | *Auto-fill quarters* runs the waterfall: Q1 first, mandated before priority, never exceeding a function's quarterly FTE. Anything that will not fit is reported, not absorbed. Shrink a function's `fte_per_quarter` in the instance JSON and re-run to see reviews come back unplaced. |
 | **Shaped plan** | The quarter Gantt by assurance function, and CSV export. |
 | **Approval** | One gate per review, routed IRR / RCA / Standard. Approving needs no comment; returning does. The dashboard cards recalculate to whatever the filters show. |
 | **Pre-staging** | Plan and IAP quarter/year are derived from Target Start Date and cannot be typed. The completeness flag tracks the 7 required fields. |
 | **Versions** | Save a baseline, change the plan, restore it. The audit trail is not rolled back — restoring is itself an audited event. |
-| **Audit trail** | Append-only. There is no edit or delete endpoint, and `DELETE /audit` returns 405. |
+| **Audit trail** | Append-only. The engine exposes no command that edits or removes an entry, and the test suite asserts that against the command list. |
 
-### Local identity
+To see the role rules bite, set `identity.roles` in the instance JSON to `["Reader"]`
+and reload — every write is refused with the role it needed.
 
-There is no FRAME in front of the API locally, so `IAP_AUTH_DEV_MODE=true` in `.env`
-supplies a synthetic user holding all three roles. To exercise RBAC, send the headers
-FRAME would:
+---
 
-```bash
-curl -H "x-frame-user: someone" -H "x-frame-ad-groups: IAP_READER" http://127.0.0.1:8010/permission
+## Tests
+
+The methodology moved into the browser, so its tests did too. Both suites cover the
+same numbered rules from `BUILD_INSTRUCTIONS.md` section 2.
+
+```powershell
+cd frontend
+npm test          # 64 cases — the engine
+npm run typecheck
 ```
 
-A reader gets 403 on any write. **`IAP_AUTH_DEV_MODE` must stay false in every deployed
-environment** — with it on, any unauthenticated caller is granted every role. It
-defaults to false and the server logs a warning on every start when it is on.
+`__tests__/domain-rules.test.ts` mirrors `backend/tests/test_domain_rules.py` case for
+case; `__tests__/workflow.test.ts` covers the refusals, the audit trail and version
+restore; `__tests__/instance.test.ts` covers loading a hosted document, including the
+shipped one.
+
+The backend suite still runs unchanged:
+
+```powershell
+cd backend
+py -m venv .venv
+.venv\Scripts\pip install -e .
+.venv\Scripts\pip install pytest ruff
+.venv\Scripts\python -m pytest        # 35 cases — the services layer
+```
+
+---
+
+## Running the backend (unchanged, not required for the POC)
+
+Nothing in the UI calls it, but it is still the deployment target and still runs:
+
+```powershell
+cd backend
+copy .env.example .env
+.venv\Scripts\python -m scripts.bootstrap --reset
+.venv\Scripts\python -m uvicorn app.main:app --port 8010 --reload
+```
+
+Swagger at [/docs](http://127.0.0.1:8010/docs). `IAP_AUTH_DEV_MODE` supplies a synthetic
+user locally and **must stay false in every deployed environment** — with it on, any
+unauthenticated caller is granted every role. It defaults to false and the server logs a
+warning on every start when it is on.
 
 ---
 
 ## Moving this into another repository
 
-The tracked files are the whole deliverable — 67 files, ~600 KB, no secrets. Everything
-regenerable is git-ignored: virtualenvs, `node_modules`, `.next`, the SQLite database,
-and `frontend/lib/api/generated/` (rebuilt with `npm run generate:api`).
+The tracked files are the whole deliverable — no secrets. Everything regenerable is
+git-ignored: virtualenvs, `node_modules`, `.next`, `out`, the SQLite database.
 
-Either push this history to the new remote:
-
-```bash
-git remote add origin <new-repo-url> && git push -u origin feature/all/IAP-1
-```
-
-or export a clean snapshot of the tracked files only:
-
-```bash
-git archive --format=tar HEAD | tar -x -C <path-to-new-repo>
+```powershell
+git remote add origin <new-repo-url>
+git push -u origin <branch>
 ```
 
 ### Change on arrival
 
 | Where | Why |
 |---|---|
-| `backend/.env` per environment | `IAP_DATABASE_URL` to Postgres, `IAP_AUTH_DEV_MODE=false`, `IAP_CORS_ORIGINS` to the deployed frontend |
-| Ports **8010** / **3010** | Local choices only — 8000 was already in use on the development machine. FRAME serves both behind the platform |
-| `frontend/next.config.mjs` | `allowedDevOrigins` is a development-only workaround; `NEXT_PUBLIC_API_BASE` should come from environment configuration |
-| `frontend/package.json` | The `generate:api` URL points at localhost |
-| Branch names | FRAME's Jenkins triggers on `feature/all/<JIRA-TICKET>`; this history uses IAP-1 |
-
-### Still to build there
-
-Alembic migrations (IAP-3), jest configuration and specs (IAP-27), the Jenkins job
-configuration, and a Postgres run — none of which could be produced or verified on the
-development machine, which has no Poetry, Postgres or Docker.
-
----
-
-## Tests
-
-```bash
-cd backend && .venv/bin/python -m pytest
-```
-
-If this reports `No module named pytest`, the dev dependencies were not installed —
-see the venv step above.
-
-35 cases covering the methodology in `BUILD_INSTRUCTIONS.md` section 2. They are written
-against the services layer, before the UI, so a later refactor cannot quietly break the
-rules.
+| `NEXT_PUBLIC_INSTANCE_URL` | Points at the hosted instance for that environment |
+| `NEXT_BASE_PATH` | Set when the site is served under a sub-path, before building |
+| `backend\.env` per environment | `IAP_DATABASE_URL` to Postgres, `IAP_AUTH_DEV_MODE=false`, `IAP_CORS_ORIGINS` |
+| Ports **8010** / **3010** | Local choices only — 8000 and 3000 were in use on the development machine |
+| `frontend\next.config.mjs` | `allowedDevOrigins` is a development-only workaround |
+| `USER_HEADER` / `GROUPS_HEADER` in `backend\app\auth\gateway.py` | If the gateway forwards different header names |
 
 ---
 
 ## Known gaps
 
-- **Alembic migrations are not written yet.** Local schema comes from
-  `scripts.bootstrap`, which is development-only. FRAME deployment needs a reversible
-  initial migration (IAP-3).
-- **No jest tests yet** — the `npm test` script exists but has no configuration or specs
-  behind it (IAP-27).
-- **Postgres is untested here.** Models target Postgres (JSONB) with SQLite variants for
-  local development; the SQLite fallback is not a deployment target.
+- **The POC is single-user by construction.** The working copy is per-browser; two
+  people editing the same hosted instance will not see each other. That is what the
+  backend exists to fix, and is why `row_version` is carried through the engine
+  unchanged rather than dropped.
+- **Rules are enforced client-side in this mode** — see the table above.
+- **No component tests yet.** The engine is covered; rendering is not (IAP-27).
+- **Alembic migrations are not written yet** (IAP-3). Local backend schema comes from
+  `scripts.bootstrap`, which is development-only.
 - **Integrations are stubs**: the scoring engine, RCA/RRIS linkage and the Helios KBD
-  reference-data feed are seeded as synthetic data. `reference.fetch_from_kbd()` is the
-  seam where the real feed lands (IAP-22, IAP-24, IAP-25).
+  reference-data feed are synthetic. In the POC they are fields in the instance
+  document; that document is the seam where the real feeds land (IAP-22, IAP-24,
+  IAP-25).
 - **The Phase 2 GenAI tab is not ported** — roadmap content, no behaviour.

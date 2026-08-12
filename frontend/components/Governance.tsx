@@ -1,48 +1,18 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
-import { api } from "@/lib/api/client";
+import { csv, select, workflow, type ReferenceKind } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
-
-interface Version {
-  id: number;
-  name: string;
-  note: string;
-  author: string;
-  created_at: string;
-  staged_count: number;
-}
-interface AuditRow {
-  id: number;
-  review_ref: string | null;
-  action: string;
-  detail: string;
-  username: string;
-  created_at: string;
-}
-interface Outstanding {
-  ref: string;
-  title: string;
-  assurance_function: string;
-  effective_priority: number | null;
-}
 
 /** Versions: snapshot and restore the whole plan state. */
 export function Versions({ plan }: { plan: PlanState }) {
-  const [versions, setVersions] = useState<Version[]>([]);
+  const { doc, run } = plan;
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [confirming, setConfirming] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    const r = await api.GET("/versions", {});
-    if (r.data) setVersions(r.data as unknown as Version[]);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const versions = useMemo(() => (doc ? select.versionRows(doc) : []), [doc]);
 
   return (
     <div className="panel">
@@ -69,11 +39,12 @@ export function Versions({ plan }: { plan: PlanState }) {
         <button
           className="btn primary"
           disabled={!name.trim()}
-          onClick={async () => {
-            await api.POST("/versions", { body: { name, note } });
-            setName("");
-            setNote("");
-            await load();
+          onClick={() => {
+            const { ok } = run((current) => workflow.saveVersion(current, { name, note }));
+            if (ok) {
+              setName("");
+              setNote("");
+            }
           }}
         >
           Save current as version
@@ -108,12 +79,7 @@ export function Versions({ plan }: { plan: PlanState }) {
                   </button>{" "}
                   <button
                     className="btn sm down"
-                    onClick={async () => {
-                      await api.DELETE("/versions/{version_id}", {
-                        params: { path: { version_id: v.id } },
-                      });
-                      await load();
-                    }}
+                    onClick={() => run((current) => workflow.deleteVersion(current, { id: v.id }))}
                   >
                     Delete
                   </button>
@@ -125,13 +91,9 @@ export function Versions({ plan }: { plan: PlanState }) {
                     <b>Restore “{v.name}”?</b> Current unsaved changes will be replaced.{" "}
                     <button
                       className="btn sm primary"
-                      onClick={async () => {
-                        await api.POST("/versions/{version_id}/restore", {
-                          params: { path: { version_id: v.id } },
-                        });
+                      onClick={() => {
+                        run((current) => workflow.restoreVersion(current, { id: v.id }));
                         setConfirming(null);
-                        await plan.refresh();
-                        await load();
                       }}
                     >
                       Confirm restore
@@ -159,15 +121,9 @@ export function Versions({ plan }: { plan: PlanState }) {
 
 /** Audit trail: chronological, append-only, exportable. */
 export function AuditTrail({ plan }: { plan: PlanState }) {
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [outstanding, setOutstanding] = useState<Outstanding[]>([]);
-
-  useEffect(() => {
-    api.GET("/audit", { params: { query: {} } }).then((r) => r.data && setRows(r.data as unknown as AuditRow[]));
-    api
-      .GET("/audit/outstanding", {})
-      .then((r) => r.data && setOutstanding(r.data as unknown as Outstanding[]));
-  }, [plan.reviews]);
+  const { doc } = plan;
+  const rows = doc?.audit ?? [];
+  const outstanding = useMemo(() => (doc ? select.outstandingRationales(doc) : []), [doc]);
 
   return (
     <>
@@ -202,9 +158,15 @@ export function AuditTrail({ plan }: { plan: PlanState }) {
           </span>
         </h3>
         <div className="rowactions">
-          <a className="btn primary" href={`${process.env.NEXT_PUBLIC_API_BASE}/audit/export`}>
+          <button
+            className="btn primary"
+            disabled={!doc}
+            onClick={() =>
+              doc && csv.downloadCsv(`${doc.plan.year}_IAP_audit_trail.csv`, csv.auditRows(doc))
+            }
+          >
             Export audit trail to CSV
-          </a>
+          </button>
         </div>
         <div className="scroll">
           <table>
@@ -248,31 +210,26 @@ export function AuditTrail({ plan }: { plan: PlanState }) {
 
 /** Reference data: the admin fallback behind the Helios KBD feed. */
 export function ReferenceData({ plan }: { plan: PlanState }) {
-  const [data, setData] = useState<Record<string, { code: string; label: string }[]> | null>(null);
-  const [impact, setImpact] = useState<Record<string, string[]> | null>(null);
-  const [text, setText] = useState<Record<string, string>>({});
+  const { doc, run } = plan;
+  const [edited, setEdited] = useState<Record<string, string> | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [d, i] = await Promise.all([
-      api.GET("/reference-data", {}),
-      api.GET("/reference-data/impact", {}),
-    ]);
-    if (d.data) {
-      const payload = d.data as unknown as Record<string, { code: string; label: string }[]>;
-      setData(payload);
-      setText({
-        taxonomy: payload.taxonomy.map((t) => `${t.code} | ${t.label}`).join("\n"),
-        business: payload.business.map((t) => t.label).join("\n"),
-        location: payload.location.map((t) => t.label).join("\n"),
-      });
-    }
-    if (i.data) setImpact(i.data as unknown as Record<string, string[]>);
-  }, []);
+  const data = doc?.reference ?? null;
+  const impact = useMemo(() => (doc ? select.referenceImpact(doc) : null), [doc]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // The textareas start from the document and only diverge once someone types.
+  const text = useMemo(
+    () =>
+      edited ??
+      (data
+        ? {
+            taxonomy: data.taxonomy.map((t) => `${t.code} | ${t.label}`).join("\n"),
+            business: data.business.map((t) => t.label).join("\n"),
+            location: data.location.map((t) => t.label).join("\n"),
+          }
+        : {}),
+    [edited, data],
+  );
 
   if (!data) return <div className="panel muted">Loading reference data…</div>;
 
@@ -319,7 +276,7 @@ export function ReferenceData({ plan }: { plan: PlanState }) {
               <textarea
                 style={{ minHeight: 200, fontFamily: "ui-monospace, monospace", fontSize: 12 }}
                 value={text[key] ?? ""}
-                onChange={(e) => setText({ ...text, [key]: e.target.value })}
+                onChange={(e) => setEdited({ ...text, [key]: e.target.value })}
               />
             </div>
           ))}
@@ -327,17 +284,23 @@ export function ReferenceData({ plan }: { plan: PlanState }) {
         <div className="rowactions" style={{ marginTop: 10 }}>
           <button
             className="btn primary"
-            onClick={async () => {
-              const r = await api.PUT("/reference-data", {
-                body: {
-                  taxonomy: parse(text.taxonomy ?? "", true),
-                  business: parse(text.business ?? "", false),
-                  location: parse(text.location ?? "", false),
-                },
-              });
-              setMessage(r.error ? "Rejected — check the values." : "Applied.");
-              await load();
-              await plan.refresh();
+            onClick={() => {
+              const lists: [ReferenceKind, boolean][] = [
+                ["taxonomy", true],
+                ["business", false],
+                ["location", false],
+              ];
+              const ok = lists.every(
+                ([kind, withCode]) =>
+                  run((current) =>
+                    workflow.replaceReference(current, {
+                      kind,
+                      entries: parse(text[kind] ?? "", withCode),
+                    }),
+                  ).ok,
+              );
+              setMessage(ok ? "Applied." : "Rejected — check the values.");
+              if (ok) setEdited(null);
             }}
           >
             Apply reference data

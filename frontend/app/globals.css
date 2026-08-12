@@ -134,6 +134,17 @@ tr.descoped td input, tr.descoped td select { opacity: .7; }
 .rris { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #fdf2d9; color: #8e6b12; border: 1px solid #eeddb0; margin: 0 3px 2px 0; white-space: nowrap; }
 .linkchip { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: var(--blue-soft); color: var(--navy); border: 1px solid #b9cbe6; margin-top: 3px; cursor: help; }
 .locchip { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; padding: 1px 5px; margin: 0 3px 3px 0; border-radius: 999px; background: var(--blue-soft); color: var(--navy); border: 1px solid #b9cbe6; white-space: nowrap; }
+.locchip .lx { border: 0; background: none; padding: 0 0 0 2px; color: var(--muted); cursor: pointer; font-size: 10px; line-height: 1; }
+.locchip .lx:hover { color: var(--over); }
+
+/* -------------------------------------------------------------- add-forms */
+.addgrid { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding: 4px 0 8px; }
+.addgrid .af { display: flex; flex-direction: column; gap: 3px; }
+.addgrid .af label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.addgrid .af.wide { flex: 1 1 280px; }
+.addgrid .af.wide input { width: 100%; }
+.addgrid .af.end { align-self: flex-end; flex-direction: row; flex-wrap: wrap; align-items: center; }
+details.help .af > label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); display: block; margin-bottom: 3px; }
 
 /* ---------------------------------------------------------------- controls */
 .btn { font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid var(--blue); background: #fff; color: var(--blue); border-radius: 6px; cursor: pointer; }

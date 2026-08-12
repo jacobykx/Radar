@@ -1,65 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { api } from "@/lib/api/client";
+import { csv, select, workflow } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
-
-interface Field {
-  key: string;
-  label: string;
-  type: string;
-  group: string;
-  allowed: string[] | null;
-  hint: string | null;
-  full_width: boolean;
-  required: boolean;
-}
-interface Spec {
-  fields: Field[];
-  business: string[];
-  location: string[];
-}
-interface Record_ {
-  ref: string;
-  title: string;
-  mandated: boolean;
-  target_start: string | null;
-  values: Record<string, string>;
-  complete: boolean;
-  missing: string[];
-}
 
 /**
  * Helios pre-staging.
  *
- * The field set is fetched from the backend rather than duplicated here — the Planning
- * Key Fields spec is owned by Helios, so a spec change should not need a UI release.
+ * The field set comes from `lib/engine/helios` — the Planning Key Fields spec, stated
+ * once. Plan/IAP quarter and year are derived there too, which is why they render as
+ * read-only however this screen is used.
  */
 export function Prestaging({ plan }: { plan: PlanState }) {
-  const [spec, setSpec] = useState<Spec | null>(null);
-  const [records, setRecords] = useState<Record_[]>([]);
+  const { doc, run } = plan;
   const [open, setOpen] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [s, list] = await Promise.all([api.GET("/prestaging/spec", {}), api.GET("/prestaging", { params: { query: {} } })]);
-    if (s.data) setSpec(s.data as unknown as Spec);
-    if (list.data) setRecords(list.data as unknown as Record_[]);
-  }, []);
+  const spec = useMemo(() => (doc ? select.prestagingSpec(doc) : null), [doc]);
+  const records = useMemo(() => (doc ? select.prestagingRows(doc) : []), [doc]);
 
-  useEffect(() => {
-    load();
-  }, [load, plan.reviews]);
+  const save = (ref: string, key: string, value: string) =>
+    run((current) => workflow.updatePrestaging(current, { ref, changes: { [key]: value } }));
 
-  const save = async (ref: string, key: string, value: string) => {
-    await api.PATCH("/prestaging/{ref}", {
-      params: { path: { ref } },
-      body: { changes: { [key]: value } },
-    });
-    await load();
-  };
-
-  if (!spec) return <div className="panel muted">Loading the Helios field spec…</div>;
+  if (!spec || !doc) return <div className="panel muted">Loading the Helios field spec…</div>;
 
   const ready = records.filter((r) => r.complete).length;
 
@@ -79,9 +42,17 @@ export function Prestaging({ plan }: { plan: PlanState }) {
         <span className="muted small">
           Plan / IAP quarter and year are derived from Target Start Date and cannot be typed.
         </span>
-        <a className="btn primary" href={`${process.env.NEXT_PUBLIC_API_BASE}/prestaging/export`}>
+        <button
+          className="btn primary"
+          onClick={() =>
+            csv.downloadCsv(
+              `${doc.plan.year}_IAP_Helios_prestaging.csv`,
+              csv.prestagingCsvRows(doc),
+            )
+          }
+        >
           Export Helios pre-staging CSV
-        </a>
+        </button>
       </div>
 
       {records.map((rec) => (

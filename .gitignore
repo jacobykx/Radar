@@ -18,10 +18,6 @@ out/
 *.tsbuildinfo
 npm-debug.log*
 
-# The generated API client IS committed, deliberately: it keeps the repo type-checkable
-# and buildable without a running backend. Regenerate it with `npm run generate:api`
-# whenever the API contract changes — never edit it by hand.
-
 # Environment — never commit connection strings or secrets
 .env
 .env.*

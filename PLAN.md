@@ -1,4 +1,4 @@
-# Build plan — 2027 IAP Planning Module (FRAME)
+# Build plan — 2027 IAP Planning Module
 
 Derived from `BUILD_INSTRUCTIONS.md`, `CLAUDE.md` and a full read of the prototype
 `2027_IAP_Planning_Module.html` (1,536 lines). The prototype is the functional spec; every
@@ -8,7 +8,7 @@ behaviour below is traced to it by line number so the port is checkable rather t
 
 ## 0. Shape of the work
 
-Two deployables in one repo, per FRAME:
+Two deployables in one repo:
 
 ```
 iap-planning/
@@ -19,7 +19,7 @@ iap-planning/
                            routing, descope cascade, snapshot/restore)
       models/              SQLAlchemy ORM
       schemas/             Pydantic in/out — read-only fields enforced here
-      auth/                FRAME Auth Service dependency -> (username, ad_groups)
+      auth/                gateway identity dependency -> (username, ad_groups)
       seed/                synthetic fixtures ported from the prototype
     migrations/            Alembic, every one reversible
     tests/                 pytest — domain rules first (section 4)
@@ -33,6 +33,10 @@ iap-planning/
 Non-negotiables carried straight through: no hand-rolled auth; the frontend renders and calls,
 it never decides; every rule enforced server-side; no `alert`/`prompt`/`confirm` — rationale is
 captured inline exactly as the prototype does (proto:837, 848).
+
+> **POC deviation (D5).** The repository as it stands runs the workflow in the browser against a
+> JSON instance, so `frontend/lib/api/` is replaced by `frontend/lib/engine/` and the generated
+> client is gone. Everything below describes the deployed build, which `backend/` still implements.
 
 ---
 
@@ -150,7 +154,7 @@ GET    /audit                                  GET /audit/export   GET /audit/ou
 Read-only enforcement: the four factor scores are absent from every request schema, and
 `PATCH /reviews/{id}` rejects them with 422 rather than ignoring them — silent drops hide bugs.
 
-RBAC from the AD Group supplied by FRAME Auth Service:
+RBAC from the AD groups supplied by the authentication gateway:
 
 | Role | Can |
 |---|---|
@@ -192,7 +196,7 @@ Jest covers rendering and the inline rationale flows (no browser dialogs), not t
 
 | # | Slice | Ends with |
 |---|---|---|
-| 1 | Skeleton | FRAME scaffold, Postgres, first migration, `/permission` wiring, Next.js shell, generated client, one review listed from the DB |
+| 1 | Skeleton | Project scaffold, Postgres, first migration, `/permission` wiring, Next.js shell, generated client, one review listed from the DB |
 | 2 | Domain tests | Section 4 red, then the services layer green — no UI yet |
 | 3 | Risk Radar | scores read-only, weights, priority + override, origin, steward, staging, descope, both add-forms, toolbar + column filters, sortable columns |
 | 4 | Staging & capacity | quarters, size/FTE edit, bottom-up fill, quarterly demand vs capacity, waterfall, clear quarters |
@@ -207,8 +211,23 @@ Each slice: migration → service → tests → API → generated client → UI 
 
 ## 6. Decisions (D — settled) and risks (R)
 
-**D0 — repository.** Scaffolded from scratch to the FRAME layout in section 0; there was no
-existing FRAME template to start from.
+**D0 — repository.** Scaffolded from scratch to the layout in section 0; there was no existing
+template to start from.
+
+**D5 — POC topology. SETTLED: the UI hosts the workflow; the instance is JSON.** For the
+proof of concept the methodology runs in the browser, as it does in the prototype, and the
+plan is a JSON instance document served as a static file (`frontend/public/instances/`,
+overridable with `NEXT_PUBLIC_INSTANCE_URL`). `frontend/lib/engine/` is a straight port of
+`backend/app/domain` plus the command half of `backend/app/services`; `backend/` is
+untouched and remains the productionisation target. The two seams that reverse this are
+`engine/instance.ts` (where the document comes from) and `engine/workflow.ts` (what may
+change it) — sections 1-4 above describe the deployed build and still stand. What the POC
+gives up: rules are enforced client-side, identity and roles travel in the instance
+document rather than coming from an authentication gateway, and the working copy is per-browser
+`localStorage`, so it is single-user. `row_version` is carried through the engine anyway,
+so R2 does not need re-plumbing later. The rules are now stated twice, in Python and
+TypeScript, and both copies carry the section 4 tests — that duplication is the cost of
+the POC and ends when the UI is pointed back at the API.
 
 **D1 — descope strictness. SETTLED: reject.** The brief says `POST /stage` returns 400 when
 descoping without a rationale. The prototype is looser: the Risk Radar checkbox un-stages
