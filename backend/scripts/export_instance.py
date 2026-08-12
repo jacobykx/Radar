@@ -81,7 +81,7 @@ def build() -> dict:
         "schema": SCHEMA,
         "id": "2027-iap",
         "plan": {"year": PLAN_YEAR, "name": f"{PLAN_YEAR} Indicative Annual Plan"},
-        # Stands in for the FRAME Auth Service, which is not in front of a static file.
+        # Stands in for the authentication gateway, which is not in front of a static file.
         "identity": {
             "username": "poc.planner",
             "ad_groups": ["IAP_PLANNER", "IAP_APPROVER", "IAP_ADMIN"],

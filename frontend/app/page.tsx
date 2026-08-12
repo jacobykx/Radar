@@ -47,8 +47,8 @@ export default function Page() {
               Working as <b>{plan.identity.username}</b> · roles{" "}
               <b>{plan.identity.roles.join(", ")}</b>
               <span style={{ opacity: 0.75 }}>
-                — identity travels in the instance document for this POC; FRAME Auth Service
-                supplies it in the deployed build
+                — identity travels in the instance document for this POC; an
+                authentication gateway supplies it in the deployed build
               </span>
             </>
           ) : (

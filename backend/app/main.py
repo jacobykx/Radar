@@ -1,7 +1,7 @@
 """FastAPI application.
 
-FRAME fronts this service: it terminates auth and routes users through the frontend.
-Nothing here implements login, sessions or tokens.
+An authentication gateway fronts this service: it terminates auth and routes users
+through the frontend. Nothing here implements login, sessions or tokens.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import governance, plan, reviews
-from app.auth.frame import CurrentUser, get_current_user
+from app.auth.gateway import CurrentUser, get_current_user
 from app.core.config import settings
 from app.domain.errors import DomainError
 
@@ -26,7 +26,7 @@ def warn_on_unsafe_configuration() -> None:
     log = logging.getLogger(__name__)
     if settings.auth_dev_mode:
         log.warning(
-            "AUTH DEV MODE IS ON — requests without FRAME user context are accepted as "
+            "AUTH DEV MODE IS ON — requests without gateway user context are accepted as "
             "%r with groups %s. Never enable this outside local development.",
             settings.dev_username,
             settings.dev_ad_groups,
@@ -80,7 +80,7 @@ def health() -> dict:
 
 @app.get("/permission", tags=["meta"])
 def permission(user: CurrentUser = Depends(get_current_user)) -> dict:
-    """Who FRAME says the caller is, and what that entitles them to do."""
+    """Who the gateway says the caller is, and what that entitles them to do."""
     return {
         "username": user.username,
         "ad_groups": list(user.ad_groups),

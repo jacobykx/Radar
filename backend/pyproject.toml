@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "iap-planning-backend"
 version = "0.1.0"
-description = "2027 IAP Planning Module — 2LOD assurance planning (FRAME application)"
+description = "2027 IAP Planning Module — 2LOD assurance planning"
 authors = ["Assurance Technology"]
 packages = [{ include = "app" }]
 

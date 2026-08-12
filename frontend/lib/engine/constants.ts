@@ -48,7 +48,7 @@ export type ReferenceKind = "taxonomy" | "business" | "location";
 export const REFERENCE_KINDS: ReferenceKind[] = ["taxonomy", "business", "location"];
 
 /**
- * Roles, as FRAME's Auth Service would supply them from AD groups.
+ * Roles, as an authentication gateway would supply them from AD groups.
  *
  * In the POC the identity comes from the instance document, so these checks demonstrate
  * the rule rather than enforce it -- anything running in a browser can be edited by the

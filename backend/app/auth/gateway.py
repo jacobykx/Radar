@@ -1,9 +1,10 @@
-"""FRAME identity and authorisation.
+"""Identity and authorisation.
 
-FRAME Auth Service validates the AM Token the frontend sends and forwards a decoded
-username and AD Group to the backend on every request. This module reads that context
-and maps AD Groups to roles. It does not validate tokens, manage sessions or issue
-credentials -- doing any of that here would be re-implementing the platform.
+The API sits behind an authentication gateway -- an IIS site with Windows
+Authentication, a reverse proxy, or any SSO front end -- which validates the sign-on
+token and forwards a decoded username and AD groups on every request. This module reads
+that context and maps AD groups to roles. It does not validate tokens, manage sessions
+or issue credentials; doing any of that here would re-implement the gateway badly.
 """
 
 from __future__ import annotations
@@ -15,9 +16,10 @@ from fastapi import Depends, Header, HTTPException, status
 
 from app.core.config import settings
 
-#: Headers populated by FRAME Auth Service once the AM Token is decoded.
-USER_HEADER = "x-frame-user"
-GROUPS_HEADER = "x-frame-ad-groups"
+#: Headers the gateway populates once the sign-on token is decoded. Configurable there,
+#: fixed here -- both ends must agree, so the names live in one place.
+USER_HEADER = "x-auth-user"
+GROUPS_HEADER = "x-auth-groups"
 
 
 class Role(str, Enum):
@@ -52,22 +54,22 @@ def _roles_for(groups: tuple[str, ...]) -> frozenset[Role]:
 
 
 def get_current_user(
-    x_frame_user: str | None = Header(default=None, alias=USER_HEADER),
-    x_frame_ad_groups: str | None = Header(default=None, alias=GROUPS_HEADER),
+    auth_user: str | None = Header(default=None, alias=USER_HEADER),
+    auth_groups: str | None = Header(default=None, alias=GROUPS_HEADER),
 ) -> CurrentUser:
-    """Resolve the caller from the context FRAME supplies.
+    """Resolve the caller from the context the gateway supplies.
 
-    In local development there is no FRAME in front of the API, so a synthetic identity
-    stands in. `auth_dev_mode` must be false in every deployed environment.
+    In local development there is no gateway in front of the API, so a synthetic
+    identity stands in. `auth_dev_mode` must be false in every deployed environment.
     """
-    username = x_frame_user
-    raw_groups = x_frame_ad_groups
+    username = auth_user
+    raw_groups = auth_groups
 
     if not username:
         if not settings.auth_dev_mode:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="No user context from FRAME Auth Service.",
+                detail="No user context from the authentication gateway.",
             )
         username = settings.dev_username
         raw_groups = raw_groups or settings.dev_ad_groups

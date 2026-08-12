@@ -2,7 +2,11 @@
 
 A 2LOD assurance planning tool: turns risk-scoring output and externally-mandated
 obligations into a shaped, capacity-feasible, signed-off annual assurance plan, exported
-to Helios. Target platform is **FRAME**.
+to Helios.
+
+For the POC it runs as a **static site** — the workflow executes in the browser and the
+plan is a JSON document served alongside it. That makes hosting it a matter of copying a
+folder onto IIS; see [Hosting on Windows](#hosting-on-windows).
 
 See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 
@@ -11,8 +15,8 @@ See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
 ## How this POC is put together
 
 The workflow runs **in the UI**, the way the HTML prototype does, and the plan it works
-on is a **JSON instance document** served as a static file. There is no database and no
-backend process in the loop:
+on is a **JSON instance document**. There is no database and no backend process in the
+loop:
 
 ```
 frontend/public/instances/2027-iap.json   the instance — reference data, capacity,
@@ -41,7 +45,7 @@ the second behind the API, and the screens above are untouched.
 | | POC | Deployed build |
 |---|---|---|
 | Rule enforcement | in the browser | server-side, un-bypassable |
-| Identity and roles | carried in the instance document | FRAME Auth Service |
+| Identity and roles | carried in the instance document | authentication gateway (IIS Windows Authentication, a reverse proxy, or SSO) |
 | Concurrency | `row_version` checked locally; one user | 409 against a shared database |
 | Persistence | `localStorage`, plus export/import of the JSON | Postgres |
 
@@ -51,20 +55,25 @@ exist in `backend/app/domain`, and the reason both copies are covered by tests.
 
 ---
 
-## Running it
+## Running it locally
 
-One process.
+Node 20 or later. One process:
 
-```bash
-cd frontend && npm install && npm run dev
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-Open **http://127.0.0.1:3010**. The instance loads from
-`/instances/2027-iap.json`; `NEXT_PUBLIC_INSTANCE_URL` points the UI at any URL that
-returns the same shape — an object store, a CDN, a colleague's edited copy:
+Open **http://127.0.0.1:3010**. The commands are identical in PowerShell, Command
+Prompt and a POSIX shell.
 
-```bash
-NEXT_PUBLIC_INSTANCE_URL=https://example.internal/plans/2027-draft.json npm run dev
+The instance loads from `/instances/2027-iap.json`. To point the UI at a different one,
+set `NEXT_PUBLIC_INSTANCE_URL` — in PowerShell:
+
+```powershell
+$env:NEXT_PUBLIC_INSTANCE_URL = "http://intranet/plans/2027-draft.json"
+npm run dev
 ```
 
 ### Working with instances
@@ -81,12 +90,78 @@ NEXT_PUBLIC_INSTANCE_URL=https://example.internal/plans/2027-draft.json npm run 
 `frontend/public/instances/2027-iap.json` is generated from the same synthetic fixtures
 the backend seeds from, so the two cannot drift:
 
-```bash
-cd backend && python3 -m scripts.export_instance
+```powershell
+cd backend
+py -m scripts.export_instance
 ```
 
 No dependencies, no database — `app/seed/data.py` is plain Python. Edit the fixtures
 there and re-run, or hand-edit the JSON for a one-off scenario.
+
+---
+
+## Hosting on Windows
+
+### As a static site on IIS (recommended for the POC)
+
+The POC does no server-side work, so it exports to a folder of files:
+
+```powershell
+cd frontend
+npm ci
+npm run build:static
+```
+
+That writes `frontend\out`. Copy its contents to the site's physical path — for example
+`C:\inetpub\wwwroot\iap` — and point an IIS site or application at it. No Node runtime
+and no application pool identity are needed on the server; it is static content.
+
+`public\web.config` is copied into the export, so the folder arrives already
+configured: `index.html` as the default document, a MIME mapping for `.json`, and
+caching disabled for `/instances` so a re-hosted plan is picked up on the next reload
+rather than after a cache expiry.
+
+**Serving under a sub-path.** An IIS *application* under a site (`https://host/iap`)
+needs the app built for that path, because the asset URLs are baked in at build time:
+
+```powershell
+$env:NEXT_BASE_PATH = "/iap"
+npm run build:static
+```
+
+The default instance URL follows `NEXT_BASE_PATH`, so `/iap/instances/2027-iap.json` is
+what the page requests. A site at the root needs no `NEXT_BASE_PATH`.
+
+**Swapping the plan without redeploying.** Overwrite
+`<site>\instances\2027-iap.json` with an exported instance. Nothing else changes — the
+UI reads it on the next load. Keep the previous file if you want to roll back.
+
+### Under Node (IIS reverse proxy, a Windows service, or a container)
+
+If you would rather run the Next.js server — for example to serve it behind IIS with
+ARR, or to add server-side pieces later:
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npm start          # http://127.0.0.1:3010
+```
+
+To keep it running across reboots, register it as a Windows service with a supervisor
+such as [NSSM](https://nssm.cc/) or `sc.exe`, pointing at `node` with
+`node_modules\next\dist\bin\next start -p 3010` as the arguments and `frontend` as the
+working directory. Front it with IIS + Application Request Routing if it needs to sit
+under an existing host name.
+
+### Identity on a Windows host
+
+The POC takes its identity from the `identity` block of the instance document, so
+"who am I" is whatever that file says. To make it real, put the app behind IIS with
+Windows Authentication and run the backend, which reads `x-auth-user` and
+`x-auth-groups` from the gateway and maps AD groups to roles
+(`backend/app/auth/gateway.py`). Those header names are the contract between the two —
+change them in one place if your gateway sends different ones.
 
 ---
 
@@ -112,9 +187,10 @@ and reload — every write is refused with the role it needed.
 The methodology moved into the browser, so its tests did too. Both suites cover the
 same numbered rules from `BUILD_INSTRUCTIONS.md` section 2.
 
-```bash
-cd frontend && npm test        # 64 cases — the engine
-cd frontend && npm run typecheck
+```powershell
+cd frontend
+npm test          # 64 cases — the engine
+npm run typecheck
 ```
 
 `__tests__/domain-rules.test.ts` mirrors `backend/tests/test_domain_rules.py` case for
@@ -124,9 +200,12 @@ shipped one.
 
 The backend suite still runs unchanged:
 
-```bash
-cd backend && python3 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/pip install pytest ruff
-cd backend && .venv/bin/python -m pytest        # 35 cases — the services layer
+```powershell
+cd backend
+py -m venv .venv
+.venv\Scripts\pip install -e .
+.venv\Scripts\pip install pytest ruff
+.venv\Scripts\python -m pytest        # 35 cases — the services layer
 ```
 
 ---
@@ -135,10 +214,11 @@ cd backend && .venv/bin/python -m pytest        # 35 cases — the services laye
 
 Nothing in the UI calls it, but it is still the deployment target and still runs:
 
-```bash
-cd backend && cp .env.example .env
-cd backend && .venv/bin/python -m scripts.bootstrap --reset
-cd backend && .venv/bin/python -m uvicorn app.main:app --port 8010 --reload
+```powershell
+cd backend
+copy .env.example .env
+.venv\Scripts\python -m scripts.bootstrap --reset
+.venv\Scripts\python -m uvicorn app.main:app --port 8010 --reload
 ```
 
 Swagger at [/docs](http://127.0.0.1:8010/docs). `IAP_AUTH_DEV_MODE` supplies a synthetic
@@ -151,10 +231,11 @@ warning on every start when it is on.
 ## Moving this into another repository
 
 The tracked files are the whole deliverable — no secrets. Everything regenerable is
-git-ignored: virtualenvs, `node_modules`, `.next`, the SQLite database.
+git-ignored: virtualenvs, `node_modules`, `.next`, `out`, the SQLite database.
 
-```bash
-git remote add origin <new-repo-url> && git push -u origin <branch>
+```powershell
+git remote add origin <new-repo-url>
+git push -u origin <branch>
 ```
 
 ### Change on arrival
@@ -162,10 +243,11 @@ git remote add origin <new-repo-url> && git push -u origin <branch>
 | Where | Why |
 |---|---|
 | `NEXT_PUBLIC_INSTANCE_URL` | Points at the hosted instance for that environment |
-| `backend/.env` per environment | `IAP_DATABASE_URL` to Postgres, `IAP_AUTH_DEV_MODE=false`, `IAP_CORS_ORIGINS` |
-| Ports **8010** / **3010** | Local choices only — FRAME serves both behind the platform |
-| `frontend/next.config.mjs` | `allowedDevOrigins` is a development-only workaround |
-| Branch names | FRAME's Jenkins triggers on `feature/all/<JIRA-TICKET>` |
+| `NEXT_BASE_PATH` | Set when the site is served under a sub-path, before building |
+| `backend\.env` per environment | `IAP_DATABASE_URL` to Postgres, `IAP_AUTH_DEV_MODE=false`, `IAP_CORS_ORIGINS` |
+| Ports **8010** / **3010** | Local choices only — 8000 and 3000 were in use on the development machine |
+| `frontend\next.config.mjs` | `allowedDevOrigins` is a development-only workaround |
+| `USER_HEADER` / `GROUPS_HEADER` in `backend\app\auth\gateway.py` | If the gateway forwards different header names |
 
 ---
 

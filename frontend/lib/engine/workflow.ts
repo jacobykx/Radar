@@ -46,8 +46,8 @@ const now = () => new Date().toISOString();
 /**
  * Role check.
  *
- * FRAME's Auth Service supplies the identity and the productionised API enforces this
- * server-side. In the POC the identity travels in the instance document, so this
+ * An authentication gateway supplies the identity and the productionised API enforces
+ * this server-side. In the POC the identity travels in the instance document, so this
  * demonstrates the rule; it is not a security control.
  */
 function requireRole(doc: InstanceDoc, ...roles: Role[]): string {
