@@ -169,6 +169,7 @@ change them in one place if your gateway sends different ones.
 
 | Stage | Worth exercising |
 |---|---|
+| **Add a review** | Two forms at the top of Risk Radar. *Regulatory Assurance* files a mandated review: it is pinned into the plan and, given a go-live date, into that date's quarter, routes to IRR at sign-off, and links to any other review sharing its RRIS ID. *Risk Assurance* files a risk-led candidate into the backlog. Both refuse to save without a rationale, and neither asks for factor scores — those are the scoring engine's. |
 | **Risk Radar** | Factor scores are read-only — there is no control to edit them. Type a new Priority, then confirm in the drawer: the override needs a rationale, and the computed value survives beside it. Un-ticking Stage opens the descope box rather than un-staging on the spot. |
 | **Staging & capacity** | *Auto-fill quarters* runs the waterfall: Q1 first, mandated before priority, never exceeding a function's quarterly FTE. Anything that will not fit is reported, not absorbed. Shrink a function's `fte_per_quarter` in the instance JSON and re-run to see reviews come back unplaced. |
 | **Shaped plan** | The quarter Gantt by assurance function, and CSV export. |

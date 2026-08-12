@@ -203,6 +203,104 @@ describe("adding a review", () => {
   });
 });
 
+describe("a newly added review flows through every stage", () => {
+  test("a risk-led review reaches staging, capacity, the plan, sign-off and pre-staging", () => {
+    const start = makeInstance([makeReview("1.1")]);
+    const { doc: added, result: ref } = workflow.addReview(start, {
+      title: "Thematic review of model change governance",
+      origin: "Risk Assurance",
+      assurance_function: "Financial Crime Assurance",
+      taxonomy_code: "fincrime",
+      business: "CIB",
+      locations: ["UK", "Global"],
+      effort_size: "L",
+      rationale: "Repeat findings in the last two model change audits",
+    });
+
+    // Risk Radar: present, in the backlog, driver-scored at the neutral mid-point.
+    const radar = select.reviews(added).find((r) => r.ref === ref)!;
+    expect(radar.staged).toBe(false);
+    expect(radar.origin).toBe("Risk Assurance");
+    expect(radar.effective_priority).toBeCloseTo(3.0);
+    expect(radar.fte).toBe(4); // L
+    // Locations come back ordered by the reference list, not the order typed.
+    expect(radar.locations).toEqual(["Global", "UK"]);
+
+    // Out of the plan until staged, so no downstream stage sees it yet.
+    expect(select.prestagingRows(added).map((r) => r.ref)).not.toContain(ref);
+    expect(select.approvalScope(added).map((r) => r.ref)).not.toContain(ref);
+
+    const staged = workflow.setStaged(added, { ref, staged: true }).doc;
+    const { doc: filled } = workflow.autofill(staged);
+    const quarter = select.findReview(filled, ref)!.item.planned_quarter;
+    expect(quarter).not.toBeNull();
+
+    // Staging & capacity: its FTE is drawn in the quarter it landed in.
+    const load = select
+      .capacityReport(filled)
+      .functions.find((f) => f.function === "Financial Crime Assurance")!;
+    expect(load.quarters.find((q) => q.quarter === quarter)!.demand).toBeGreaterThanOrEqual(4);
+
+    // Shaped plan.
+    const group = select
+      .shapedPlan(filled)
+      .groups.find((g) => g.function === "Financial Crime Assurance")!;
+    expect(group.reviews.map((r) => r.ref)).toContain(ref);
+
+    // Approval: in scope, on the Standard route, and it signs off.
+    expect(select.approvalScope(filled).map((r) => r.ref)).toContain(ref);
+    const signed = workflow.decide(filled, { ref, decision: "Approved" }).doc;
+    expect(select.reviews(signed).find((r) => r.ref === ref)!.approval_status).toBe("Approved");
+
+    // Pre-staging: seeded from what the plan already knows.
+    const row = select.prestagingRows(signed).find((r) => r.ref === ref)!;
+    expect(row.values.reviewId).toBe(`AREV-${ref.replace(/\./g, "")}`);
+    expect(row.values.reviewType).toBe("Additional");
+    expect(row.values.assuranceFunction).toBe("Financial Crime Assurance");
+    expect(row.values.location).toBe("Global; UK");
+    expect(row.complete).toBe(false); // the required fields are still the user's to fill
+
+    // Audit and the decision log carry the rationale.
+    expect(signed.audit.some((e) => e.review_ref === ref && e.action === "Review added")).toBe(true);
+    expect(select.findReview(signed, ref)!.notes[0].text).toContain("[Rationale]");
+
+    // A version snapshot captures it like any other review.
+    const versioned = workflow.saveVersion(signed, { name: "with the new review" }).doc;
+    expect(Object.keys(versioned.versions[0].snapshot.reviews)).toContain(ref);
+  });
+
+  test("a mandated review is pinned into its go-live quarter and routes to IRR", () => {
+    const start = makeInstance([makeReview("1.1")]);
+    const { doc, result: ref } = workflow.addReview(start, {
+      title: "New regulatory reporting return",
+      origin: "Regulatory Assurance",
+      assurance_function: "Financial Crime Assurance",
+      rationale: "First live submissions land in 2027",
+      regulator: "PRA / FCA",
+      regulation: "PS7/26",
+      rris_ids: "RRIS-10421, RRIS-10422",
+      go_live: "2027-08-01",
+    });
+
+    const review = select.reviews(doc).find((r) => r.ref === ref)!;
+    expect(review.mandated).toBe(true);
+    expect(review.staged).toBe(true);
+    expect(review.planned_quarter).toBe("Q3");
+    expect(review.band).toBe("Mandated");
+    expect(review.effective_priority).toBeNull();
+    expect(review.route).toBe("IRR");
+    expect(review.rris_ids).toEqual(["RRIS-10421", "RRIS-10422"]);
+
+    // Pre-staging is seeded as an externally-mandated review, dated from the go-live.
+    const row = select.prestagingRows(doc).find((r) => r.ref === ref)!;
+    expect(row.values.reviewType).toBe("Core - Externally mandated");
+    expect(row.values.planQuarter).toBe("Q3");
+
+    // Auto-fill leaves the obligation where the regulator put it.
+    expect(workflow.autofill(doc).result.quarters[ref]).toBe("Q3");
+  });
+});
+
 describe("versions", () => {
   test("restore puts every captured field back without rewinding the audit trail", () => {
     const start = makeInstance([makeReview("1.1", { size: "M", quarter: "Q1" })]);

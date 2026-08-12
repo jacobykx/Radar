@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { workflow, type EffortSize, type Review } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
 
+import { AddReview } from "./AddReview";
+
 type SortKey = "risk" | "urgency" | "coverage_gap" | "change" | "effective_priority" | "effort_days";
 
 /** Factor scores live under `scores`; priority and effort are top-level. */
@@ -80,6 +82,7 @@ export function RiskRadar({ plan }: { plan: PlanState }) {
 
   return (
     <>
+      <AddReview plan={plan} />
       {weights && <WeightPanel plan={plan} />}
 
       <div className="panel">
