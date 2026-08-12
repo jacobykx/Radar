@@ -8,7 +8,7 @@ import { Prestaging } from "@/components/Prestaging";
 import { RiskRadar } from "@/components/RiskRadar";
 import { ShapedPlan } from "@/components/ShapedPlan";
 import { StagingCapacity } from "@/components/StagingCapacity";
-import { QUARTERS } from "@/lib/api/client";
+import { csv, QUARTERS } from "@/lib/engine";
 import { usePlan } from "@/lib/usePlan";
 
 const TABS = [
@@ -25,19 +25,7 @@ const TABS = [
 export default function Page() {
   const plan = usePlan();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Risk Radar");
-  const s = plan.summary as Record<string, never> | null;
-  const summary = s as unknown as {
-    candidates: number;
-    in_scope: number;
-    descoped: number;
-    scheduled: number;
-    unscheduled: number;
-    outstanding_rationales: number;
-    annual_fte_quarters: number;
-    used_fte: number;
-    utilisation_pct: number;
-    fte_by_quarter: Record<string, number>;
-  } | null;
+  const summary = plan.summary;
 
   const qMax = summary
     ? Math.max(1, ...Object.values(summary.fte_by_quarter), summary.annual_fte_quarters / 4)
@@ -59,12 +47,36 @@ export default function Page() {
               Working as <b>{plan.identity.username}</b> · roles{" "}
               <b>{plan.identity.roles.join(", ")}</b>
               <span style={{ opacity: 0.75 }}>
-                — identity comes from FRAME Auth Service; every decision is logged against it
+                — identity travels in the instance document for this POC; FRAME Auth Service
+                supplies it in the deployed build
               </span>
             </>
           ) : (
             "Resolving identity…"
           )}
+        </div>
+
+        <div className="rowactions" style={{ marginTop: 10, marginBottom: 0 }}>
+          <span className="muted small">
+            Plan and workflow run in this page; the instance is served from{" "}
+            <code>{plan.url}</code>
+            {plan.doc && ` · ${plan.doc.plan.name} · revision ${plan.doc.revision}`}
+          </span>
+          <button
+            className="btn sm"
+            disabled={!plan.doc}
+            onClick={() => plan.doc && csv.downloadInstance(plan.doc)}
+            title="Download the working plan as an instance document — host that file to resume from it"
+          >
+            Export instance JSON
+          </button>
+          <button
+            className="btn sm ghost"
+            onClick={() => plan.reset()}
+            title="Discard local changes and re-read the hosted instance"
+          >
+            Reset to hosted instance
+          </button>
         </div>
       </header>
 

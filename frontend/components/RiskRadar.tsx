@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { api, type Review } from "@/lib/api/client";
+import { workflow, type EffortSize, type Review } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
 
 type SortKey = "risk" | "urgency" | "coverage_gap" | "change" | "effective_priority" | "effort_days";
@@ -22,7 +22,7 @@ function sortValue(review: Review, key: SortKey): number {
  * rationale, captured inline in the drawer rather than in a browser dialog.
  */
 export function RiskRadar({ plan }: { plan: PlanState }) {
-  const { reviews, weights, act } = plan;
+  const { reviews, weights } = plan;
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("effective_priority");
   const [sortDir, setSortDir] = useState(-1);
@@ -174,8 +174,7 @@ function RadarRow({
   open: boolean;
   onToggle: () => void;
 }) {
-  const { act } = plan;
-  const [draft, setDraft] = useState<string>("");
+  const { run } = plan;
   const [pending, setPending] = useState<number | null>(null);
 
   const priority = r.effective_priority;
@@ -190,12 +189,7 @@ function RadarRow({
             aria-label={`Stage ${r.ref}`}
             onChange={(e) => {
               if (e.target.checked) {
-                act(() =>
-                  api.POST("/reviews/{ref}/stage", {
-                    params: { path: { ref: r.ref } },
-                    body: { staged: true },
-                  }),
-                );
+                run((doc) => workflow.setStaged(doc, { ref: r.ref, staged: true }));
               } else {
                 // Rule 6: descoping needs a rationale, so open the drawer rather than
                 // un-staging on the spot. The API refuses it either way.
@@ -288,11 +282,8 @@ function RadarRow({
             value={r.effort_size}
             aria-label={`Effort size for ${r.ref}`}
             onChange={(e) =>
-              act(() =>
-                api.PATCH("/reviews/{ref}", {
-                  params: { path: { ref: r.ref } },
-                  body: { effort_size: e.target.value as "S" | "M" | "L" },
-                }),
+              run((doc) =>
+                workflow.setEffortSize(doc, { ref: r.ref, size: e.target.value as EffortSize }),
               )
             }
           >
@@ -318,11 +309,13 @@ function RadarRow({
                       label={`Confirm override to ${pending.toFixed(2)}`}
                       placeholder="Rationale for the override (required)"
                       confirmLabel="Confirm override"
-                      onConfirm={async (text) => {
-                        const ok = await act(() =>
-                          api.POST("/reviews/{ref}/priority-override", {
-                            params: { path: { ref: r.ref } },
-                            body: { value: pending, rationale: text, row_version: r.row_version },
+                      onConfirm={(text) => {
+                        const { ok } = run((doc) =>
+                          workflow.setPriorityOverride(doc, {
+                            ref: r.ref,
+                            value: pending,
+                            rationale: text,
+                            row_version: r.row_version,
                           }),
                         );
                         if (ok) setPending(null);
@@ -344,11 +337,7 @@ function RadarRow({
                           <button
                             className="btn sm"
                             onClick={() =>
-                              act(() =>
-                                api.DELETE("/reviews/{ref}/priority-override", {
-                                  params: { path: { ref: r.ref } },
-                                }),
-                              )
+                              run((doc) => workflow.clearPriorityOverride(doc, { ref: r.ref }))
                             }
                           >
                             Reset to computed
@@ -369,12 +358,14 @@ function RadarRow({
                     confirmLabel="Confirm descope"
                     hint="It will stop flowing to staging, capacity, approval, pre-staging and the plan."
                     onConfirm={(text) =>
-                      act(() =>
-                        api.POST("/reviews/{ref}/stage", {
-                          params: { path: { ref: r.ref } },
-                          body: { staged: false, rationale: text, row_version: r.row_version },
+                      run((doc) =>
+                        workflow.setStaged(doc, {
+                          ref: r.ref,
+                          staged: false,
+                          rationale: text,
+                          row_version: r.row_version,
                         }),
-                      )
+                      ).ok
                     }
                   />
                 ) : (
@@ -389,12 +380,7 @@ function RadarRow({
                     <button
                       className="btn sm up"
                       onClick={() =>
-                        act(() =>
-                          api.POST("/reviews/{ref}/stage", {
-                            params: { path: { ref: r.ref } },
-                            body: { staged: true },
-                          }),
-                        )
+                        run((doc) => workflow.setStaged(doc, { ref: r.ref, staged: true }))
                       }
                     >
                       Bring back into scope
@@ -419,12 +405,8 @@ function RadarRow({
                       single
                       hint="Stewards are consulted before the plan is shaped, so their requirements are reflected rather than raised at quarter-end."
                       onConfirm={(text) =>
-                        act(() =>
-                          api.POST("/reviews/{ref}/steward", {
-                            params: { path: { ref: r.ref } },
-                            body: { steward_name: text },
-                          }),
-                        )
+                        run((doc) => workflow.recordSteward(doc, { ref: r.ref, steward_name: text }))
+                          .ok
                       }
                     />
                   )}
@@ -462,14 +444,7 @@ function RadarRow({
                   label=""
                   placeholder="Add a note / rationale…"
                   confirmLabel="Add note"
-                  onConfirm={(text) =>
-                    act(() =>
-                      api.POST("/reviews/{ref}/notes", {
-                        params: { path: { ref: r.ref } },
-                        body: { text },
-                      }),
-                    )
-                  }
+                  onConfirm={(text) => run((doc) => workflow.addNote(doc, { ref: r.ref, text })).ok}
                 />
                 {(r.notes ?? []).length === 0 ? (
                   <p className="muted small">No notes yet.</p>
@@ -563,7 +538,7 @@ export function RationaleBox({
 }
 
 function WeightPanel({ plan }: { plan: PlanState }) {
-  const { weights, act } = plan;
+  const { weights, run } = plan;
   const [local, setLocal] = useState(weights);
 
   if (!weights || !local) return null;
@@ -597,8 +572,8 @@ function WeightPanel({ plan }: { plan: PlanState }) {
               value={local[key]}
               aria-label={`${label} weight`}
               onChange={(e) => setLocal({ ...local, [key]: Number(e.target.value) })}
-              onMouseUp={() => act(() => api.PUT("/plan/weights", { body: local }))}
-              onTouchEnd={() => act(() => api.PUT("/plan/weights", { body: local }))}
+              onMouseUp={() => run((doc) => workflow.setWeights(doc, local))}
+              onTouchEnd={() => run((doc) => workflow.setWeights(doc, local))}
             />
           </div>
         ))}

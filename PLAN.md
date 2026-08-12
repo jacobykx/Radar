@@ -34,6 +34,10 @@ Non-negotiables carried straight through: no hand-rolled auth; the frontend rend
 it never decides; every rule enforced server-side; no `alert`/`prompt`/`confirm` — rationale is
 captured inline exactly as the prototype does (proto:837, 848).
 
+> **POC deviation (D5).** The repository as it stands runs the workflow in the browser against a
+> JSON instance, so `frontend/lib/api/` is replaced by `frontend/lib/engine/` and the generated
+> client is gone. Everything below describes the deployed build, which `backend/` still implements.
+
 ---
 
 ## 1. Domain model
@@ -209,6 +213,21 @@ Each slice: migration → service → tests → API → generated client → UI 
 
 **D0 — repository.** Scaffolded from scratch to the FRAME layout in section 0; there was no
 existing FRAME template to start from.
+
+**D5 — POC topology. SETTLED: the UI hosts the workflow; the instance is JSON.** For the
+proof of concept the methodology runs in the browser, as it does in the prototype, and the
+plan is a JSON instance document served as a static file (`frontend/public/instances/`,
+overridable with `NEXT_PUBLIC_INSTANCE_URL`). `frontend/lib/engine/` is a straight port of
+`backend/app/domain` plus the command half of `backend/app/services`; `backend/` is
+untouched and remains the productionisation target. The two seams that reverse this are
+`engine/instance.ts` (where the document comes from) and `engine/workflow.ts` (what may
+change it) — sections 1-4 above describe the deployed build and still stand. What the POC
+gives up: rules are enforced client-side, identity and roles travel in the instance
+document rather than coming from FRAME Auth Service, and the working copy is per-browser
+`localStorage`, so it is single-user. `row_version` is carried through the engine anyway,
+so R2 does not need re-plumbing later. The rules are now stated twice, in Python and
+TypeScript, and both copies carry the section 4 tests — that duplication is the cost of
+the POC and ends when the UI is pointed back at the API.
 
 **D1 — descope strictness. SETTLED: reject.** The brief says `POST /stage` returns 400 when
 descoping without a rationale. The prototype is looser: the Risk Radar checkbox un-stages

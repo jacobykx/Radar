@@ -1,39 +1,16 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
-import { api, QUARTERS } from "@/lib/api/client";
+import { csv, QUARTERS, select } from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
-
-interface PlanReview {
-  ref: string;
-  title: string;
-  mandated: boolean;
-  size: string;
-  fte: number;
-  business: string | null;
-  locations: string[];
-  quarter: string | null;
-  band: string;
-}
-interface Group {
-  function: string;
-  total_fte: number;
-  by_quarter: Record<string, number>;
-  reviews: PlanReview[];
-}
 
 /** The shaped plan: a quarter Gantt grouped by assurance function. */
 export function ShapedPlan({ plan }: { plan: PlanState }) {
-  const [groups, setGroups] = useState<Group[]>([]);
+  const { doc } = plan;
   const [team, setTeam] = useState("");
 
-  useEffect(() => {
-    api
-      .GET("/plan/shaped", {})
-      .then((r) => r.data && setGroups((r.data as unknown as { groups: Group[] }).groups));
-  }, [plan.reviews]);
-
+  const groups = useMemo(() => (doc ? select.shapedPlan(doc).groups : []), [doc]);
   const shown = groups.filter((g) => !team || g.function === team);
 
   return (
@@ -52,9 +29,15 @@ export function ShapedPlan({ plan }: { plan: PlanState }) {
             ))}
           </select>
         </label>
-        <a className="btn primary" href={`${process.env.NEXT_PUBLIC_API_BASE}/plan/export`}>
+        <button
+          className="btn primary"
+          disabled={!doc}
+          onClick={() =>
+            doc && csv.downloadCsv(`${doc.plan.year}_IAP_shaped_plan.csv`, csv.planRows(doc))
+          }
+        >
           Export plan to CSV
-        </a>
+        </button>
       </div>
 
       <div className="scroll">

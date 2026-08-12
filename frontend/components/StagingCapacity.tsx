@@ -1,28 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { api, QUARTERS, type Quarter, type Review } from "@/lib/api/client";
+import {
+  QUARTERS,
+  select,
+  workflow,
+  type EffortSize,
+  type Quarter,
+  type Review,
+} from "@/lib/engine";
 import type { PlanState } from "@/lib/usePlan";
-
-interface Capacity {
-  scope: {
-    label: string;
-    candidate_reviews: number;
-    fte_per_quarter: number;
-    annual_fte_quarters: number;
-  };
-  bottom_up: {
-    annual_fte_quarters: number;
-    mandated_fte: number;
-    additional_fte: number;
-    remaining_after_mandated: number;
-    headroom: number;
-    over: boolean;
-  };
-  aggregate: { quarter: string; capacity: number; demand: number; over: boolean; warn: boolean }[];
-  unscheduled_count: number;
-}
 
 type SortKey = "default" | "staged" | "ref" | "origin" | "eff" | "effort" | "quarter";
 
@@ -36,37 +24,32 @@ type SortKey = "default" | "staged" | "ref" | "origin" | "eff" | "effort" | "qua
  * one function's spare FTE never covers another's.
  */
 export function StagingCapacity({ plan }: { plan: PlanState }) {
-  const { reviews, act, refresh } = plan;
-  const [capacity, setCapacity] = useState<Capacity | null>(null);
+  const { doc, reviews, run } = plan;
   const [team, setTeam] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("default");
   const [sortDir, setSortDir] = useState(1);
 
-  const loadCapacity = useCallback(async () => {
-    const r = await api.GET("/capacity", { params: { query: team ? { team } : {} } });
-    if (r.data) setCapacity(r.data as unknown as Capacity);
-  }, [team]);
-
-  useEffect(() => {
-    loadCapacity();
-  }, [loadCapacity, reviews]);
+  // Capacity is recomputed from the plan itself, so it can never disagree with the
+  // table below it -- there is no second fetch to fall out of step.
+  const capacity = useMemo(
+    () => (doc ? select.capacityReport(doc, team || undefined) : null),
+    [doc, team],
+  );
 
   const teams = [...new Set(reviews.map((r) => r.assurance_function))].sort();
   const scope = reviews.filter((r) => !r.descoped && (!team || r.assurance_function === team));
 
-  const autofill = async () => {
-    const r = await api.POST("/plan/autofill", {});
-    if (r.data) {
-      const d = r.data as { summary: string; unplaced: { ref: string }[] };
-      setResult(
-        d.unplaced.length > 0
-          ? `${d.summary}. Could not fit: ${d.unplaced.map((u) => u.ref).join(", ")} — descope, resize or add capacity.`
-          : d.summary,
-      );
-    }
-    await refresh();
-    await loadCapacity();
+  const autofill = () => {
+    const { result: waterfall } = run((current) => workflow.autofill(current));
+    if (!waterfall) return;
+    setResult(
+      waterfall.unplaced.length > 0
+        ? `${waterfall.summary}. Could not fit: ${waterfall.unplaced
+            .map((u) => u.ref)
+            .join(", ")} — descope, resize or add capacity.`
+        : waterfall.summary,
+    );
   };
 
   const rows = [...scope].sort((a, b) => {
@@ -133,11 +116,9 @@ export function StagingCapacity({ plan }: { plan: PlanState }) {
           </button>
           <button
             className="btn ghost"
-            onClick={async () => {
-              await api.POST("/plan/clear-quarters", {});
+            onClick={() => {
+              run((current) => workflow.clearQuarters(current));
               setResult(null);
-              await refresh();
-              await loadCapacity();
             }}
           >
             Clear quarters
@@ -280,10 +261,10 @@ export function StagingCapacity({ plan }: { plan: PlanState }) {
                     value={r.effort_size}
                     aria-label={`Size for ${r.ref}`}
                     onChange={(e) =>
-                      act(() =>
-                        api.PATCH("/reviews/{ref}", {
-                          params: { path: { ref: r.ref } },
-                          body: { effort_size: e.target.value as "S" | "M" | "L" },
+                      run((current) =>
+                        workflow.setEffortSize(current, {
+                          ref: r.ref,
+                          size: e.target.value as EffortSize,
                         }),
                       )
                     }
@@ -304,11 +285,8 @@ export function StagingCapacity({ plan }: { plan: PlanState }) {
                         : "FTE required"
                     }
                     onChange={(e) =>
-                      act(() =>
-                        api.PATCH("/reviews/{ref}", {
-                          params: { path: { ref: r.ref } },
-                          body: { fte_override: Number(e.target.value) },
-                        }),
+                      run((current) =>
+                        workflow.setFte(current, { ref: r.ref, fte: Number(e.target.value) }),
                       )
                     }
                   >
@@ -325,10 +303,10 @@ export function StagingCapacity({ plan }: { plan: PlanState }) {
                     disabled={!r.staged}
                     aria-label={`Quarter for ${r.ref}`}
                     onChange={(e) =>
-                      act(() =>
-                        api.PATCH("/reviews/{ref}/quarter", {
-                          params: { path: { ref: r.ref } },
-                          body: { quarter: (e.target.value || null) as Quarter | null },
+                      run((current) =>
+                        workflow.setQuarter(current, {
+                          ref: r.ref,
+                          quarter: (e.target.value || null) as Quarter | null,
                         }),
                       )
                     }
