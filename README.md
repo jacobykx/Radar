@@ -8,7 +8,8 @@ For the POC it runs as a **static site** — the workflow executes in the browse
 plan is a JSON document served alongside it. That makes hosting it a matter of copying a
 folder onto IIS; see [Hosting on Windows](#hosting-on-windows).
 
-See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions.
+See [PLAN.md](PLAN.md) for the build plan, data model and settled decisions, and
+[HANDOVER.md](HANDOVER.md) for carrying the work on yourself with Copilot on Windows.
 
 ---
 
@@ -242,14 +243,16 @@ The methodology moved into the browser, so its tests did too. Both suites cover 
 same numbered rules from `BUILD_INSTRUCTIONS.md` section 2.
 
 ```powershell
-npm test          # 66 cases — the engine
+npm test          # 70 cases — the engine
 npm run typecheck
 ```
 
 `__tests__/domain-rules.test.ts` mirrors `backend/tests/test_domain_rules.py` case for
 case; `__tests__/workflow.test.ts` covers the refusals, the audit trail and version
 restore; `__tests__/instance.test.ts` covers loading a hosted document, including the
-shipped one.
+shipped one; `__tests__/conventions.test.ts` asserts the two rules that are not
+calculations — factor scores are never editable, and rationale is captured inline rather
+than in a browser dialog.
 
 The backend suite still runs unchanged:
 
