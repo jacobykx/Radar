@@ -99,13 +99,17 @@ normal. When it finishes, `npm run dev` prints `Ready in …`. Open
 
 Stop it with `Ctrl+C`. Next time, only `npm run dev` is needed.
 
-> The commands above run from the **repository root** — `package.json` there forwards
-> them to `frontend`. Running them inside `frontend` works too; nothing else does.
+> The commands above run from the **repository root**. It is an npm workspace, so one
+> `npm install` there provisions the app in `frontend`, and `npm run dev`, `npm test`,
+> `npm run build` and `npm run build:static` all forward to it. Running the same
+> commands inside `frontend` works too; no other folder does.
 
 ### If something goes wrong
 
 | What you see | What it means |
 |---|---|
+| `npm error Exit handler never called!` during `npm install` | An npm bug that older copies of this repo tripped over. Pull the latest `main`, delete any `node_modules` folder left behind, and run `npm install` again. If it persists, run `cd frontend` then `npm install` and `npm run dev` — that path does not go through the root. |
+| `'next' is not recognized as an internal or external command` | The dependencies are not installed — usually because an earlier `npm install` failed. Fix that first; `npm run dev` cannot work without it. |
 | `npm error enoent Could not read package.json` | You are in the wrong folder. `dir` should list `frontend`, `backend` and `README.md`; if it does not, `cd` to the folder that does. Extracting a ZIP often nests it — `Radar\Radar\…` — so you may need to `cd Radar` once more. |
 | `npm : File …\npm.ps1 cannot be loaded because running scripts is disabled` | PowerShell's execution policy. Either use **Command Prompt** instead, or run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` in PowerShell and answer `Y`. |
 | `'npm' is not recognized` | Node is not installed, or the window was open before you installed it. Close it, open a new one, and check `node -v`. |
