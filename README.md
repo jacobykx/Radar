@@ -121,6 +121,27 @@ Corporate laptops sometimes route npm through an internal registry. If `npm inst
 cannot reach the network, ask IT for the registry URL and set it once with
 `npm config set registry <url>`.
 
+### When npm will not cooperate at all
+
+`npm install` can fail for reasons that have nothing to do with this repository — a
+corrupted cache, antivirus holding files open, a locked-down machine. The built app
+needs none of it. On a machine where the build already worked:
+
+```powershell
+npm run build:static
+```
+
+then, on the machine that cannot install, with only Node present:
+
+```powershell
+node serve.js
+```
+
+`serve.js` is a dependency-free static server: no packages, no internet, loopback only.
+It serves `frontend\out` by default, or `node serve.js <folder> <port>` for anything
+else. Opening `index.html` directly does **not** work — the browser blocks the instance
+fetch on `file://`, which is the whole reason this script exists.
+
 ### Pointing at a different plan
 
 The instance loads from `/instances/2027-iap.json`. To use another one, set
