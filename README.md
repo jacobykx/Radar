@@ -55,21 +55,71 @@ exist in `backend/app/domain`, and the reason both copies are covered by tests.
 
 ---
 
-## Running it locally
+## Running it on a Windows laptop
 
-Node 20 or later. One process:
+### 1. Install Node.js (once)
+
+Download the **LTS** installer from [nodejs.org](https://nodejs.org/) and accept the
+defaults. Then **open a new PowerShell window** — an already-open one will not have
+Node on its PATH — and check it:
 
 ```powershell
-cd frontend
+node -v      # v20.x or later
+npm -v
+```
+
+### 2. Get the code
+
+Either clone it:
+
+```powershell
+cd $HOME\Documents
+git clone https://github.com/jacobykx/Radar.git
+```
+
+or, without Git: **Code → Download ZIP** on GitHub, then right-click the file →
+**Extract All**. Windows blocks files from the internet until they are unblocked, so if
+anything behaves oddly, right-click the ZIP → Properties → tick **Unblock** before
+extracting.
+
+### 3. Run it
+
+From the folder you just created — the one containing `README.md`, `frontend` and
+`backend`:
+
+```powershell
+cd $HOME\Documents\Radar
 npm install
 npm run dev
 ```
 
-Open **http://127.0.0.1:3010**. The commands are identical in PowerShell, Command
-Prompt and a POSIX shell.
+`npm install` takes a couple of minutes the first time and prints a lot; that is
+normal. When it finishes, `npm run dev` prints `Ready in …`. Open
+**http://127.0.0.1:3010** in your browser.
 
-The instance loads from `/instances/2027-iap.json`. To point the UI at a different one,
-set `NEXT_PUBLIC_INSTANCE_URL` — in PowerShell:
+Stop it with `Ctrl+C`. Next time, only `npm run dev` is needed.
+
+> The commands above run from the **repository root** — `package.json` there forwards
+> them to `frontend`. Running them inside `frontend` works too; nothing else does.
+
+### If something goes wrong
+
+| What you see | What it means |
+|---|---|
+| `npm error enoent Could not read package.json` | You are in the wrong folder. `dir` should list `frontend`, `backend` and `README.md`; if it does not, `cd` to the folder that does. Extracting a ZIP often nests it — `Radar\Radar\…` — so you may need to `cd Radar` once more. |
+| `npm : File …\npm.ps1 cannot be loaded because running scripts is disabled` | PowerShell's execution policy. Either use **Command Prompt** instead, or run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` in PowerShell and answer `Y`. |
+| `'npm' is not recognized` | Node is not installed, or the window was open before you installed it. Close it, open a new one, and check `node -v`. |
+| `EADDRINUSE … 3010`, or Next.js says a server is already running | Something already holds the port — most often a previous `npm run dev` you did not stop. Close that window, or start on another port with `cd frontend` then `npx next dev -p 3011`, and open **http://127.0.0.1:3011**. |
+| The page loads but says it cannot load the instance | `frontend\public\instances\2027-iap.json` is missing or the ZIP extracted incompletely. Re-extract, or regenerate it (see below). |
+
+Corporate laptops sometimes route npm through an internal registry. If `npm install`
+cannot reach the network, ask IT for the registry URL and set it once with
+`npm config set registry <url>`.
+
+### Pointing at a different plan
+
+The instance loads from `/instances/2027-iap.json`. To use another one, set
+`NEXT_PUBLIC_INSTANCE_URL` before starting:
 
 ```powershell
 $env:NEXT_PUBLIC_INSTANCE_URL = "http://intranet/plans/2027-draft.json"
@@ -93,6 +143,7 @@ the backend seeds from, so the two cannot drift:
 ```powershell
 cd backend
 py -m scripts.export_instance
+cd ..
 ```
 
 No dependencies, no database — `app/seed/data.py` is plain Python. Edit the fixtures
@@ -107,8 +158,7 @@ there and re-run, or hand-edit the JSON for a one-off scenario.
 The POC does no server-side work, so it exports to a folder of files:
 
 ```powershell
-cd frontend
-npm ci
+npm install
 npm run build:static
 ```
 
@@ -142,8 +192,7 @@ If you would rather run the Next.js server — for example to serve it behind II
 ARR, or to add server-side pieces later:
 
 ```powershell
-cd frontend
-npm ci
+npm install
 npm run build
 npm start          # http://127.0.0.1:3010
 ```
@@ -189,8 +238,7 @@ The methodology moved into the browser, so its tests did too. Both suites cover 
 same numbered rules from `BUILD_INSTRUCTIONS.md` section 2.
 
 ```powershell
-cd frontend
-npm test          # 64 cases — the engine
+npm test          # 66 cases — the engine
 npm run typecheck
 ```
 
